@@ -8,6 +8,7 @@ import {
   MONTHS_LONG,
   RANGE_PRESETS,
   formatRange,
+  formatRangeShort,
   parseISO,
   toISO,
   type DateRange,
@@ -21,7 +22,8 @@ const monthIndex = (iso: string) => {
   return d.getUTCFullYear() * 12 + d.getUTCMonth()
 }
 const MIN_VIEW = monthIndex(DATA_MIN)
-const MAX_VIEW = monthIndex(DATA_MAX) - 1 // bulan kiri; bulan kanan = MAX_VIEW + 1
+// Layar lebar (2 bulan): bulan kiri maksimal = bulan terakhir - 1. Layar sempit (1 bulan): sampai bulan terakhir.
+const MAX_VIEW_WIDE = monthIndex(DATA_MAX) - 1
 
 function MonthGrid({
   index,
@@ -109,8 +111,20 @@ export function DateRangePicker({ value, onChange }: { value: DateRange; onChang
   const [open, setOpen] = useState(false)
   const [anchor, setAnchor] = useState<string | null>(null)
   const [hover, setHover] = useState<string | null>(null)
-  const [view, setView] = useState(() => Math.min(Math.max(monthIndex(value.from), MIN_VIEW), MAX_VIEW))
+  const [view, setView] = useState(() => Math.min(Math.max(monthIndex(value.from), MIN_VIEW), MAX_VIEW_WIDE))
   const ref = useRef<HTMLDivElement>(null)
+
+  // Layar lebar = 2 bulan, layar sempit = 1 bulan
+  const [wide, setWide] = useState(true)
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 640px)")
+    const sync = () => setWide(mq.matches)
+    sync()
+    mq.addEventListener("change", sync)
+    return () => mq.removeEventListener("change", sync)
+  }, [])
+  const maxView = wide ? MAX_VIEW_WIDE : MAX_VIEW_WIDE + 1
+  const shownView = Math.min(view, maxView)
 
   const close = () => {
     setOpen(false)
@@ -134,7 +148,7 @@ export function DateRangePicker({ value, onChange }: { value: DateRange; onChang
 
   const toggle = () => {
     if (open) return close()
-    setView(Math.min(Math.max(monthIndex(value.from), MIN_VIEW), MAX_VIEW))
+    setView(Math.min(Math.max(monthIndex(value.from), MIN_VIEW), maxView))
     setOpen(true)
   }
 
@@ -166,7 +180,7 @@ export function DateRangePicker({ value, onChange }: { value: DateRange; onChang
         aria-label="Rentang tanggal"
         className="flex h-9 w-full items-center justify-between gap-2 rounded-md border bg-card px-3 text-sm shadow-xs outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50"
       >
-        <span className="truncate">{formatRange(value)}</span>
+        <span className="truncate">{formatRangeShort(value)}</span>
         <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden />
       </button>
 
@@ -201,30 +215,37 @@ export function DateRangePicker({ value, onChange }: { value: DateRange; onChang
           <div className="flex items-start gap-1">
             <button
               type="button"
-              onClick={() => setView((v) => Math.max(v - 1, MIN_VIEW))}
-              disabled={view <= MIN_VIEW}
+              onClick={() => setView(Math.max(shownView - 1, MIN_VIEW))}
+              disabled={shownView <= MIN_VIEW}
               aria-label="Bulan sebelumnya"
               className="mt-0.5 rounded-md p-1 hover:bg-muted disabled:opacity-30"
             >
               <ChevronLeft className="size-4" />
             </button>
             <div className="flex flex-col gap-4 sm:flex-row">
-              <MonthGrid index={view} value={value} anchor={anchor} hover={hover} onPick={pick} onHover={setHover} />
-              <div className="hidden sm:block">
+              <MonthGrid
+                index={shownView}
+                value={value}
+                anchor={anchor}
+                hover={hover}
+                onPick={pick}
+                onHover={setHover}
+              />
+              {wide && (
                 <MonthGrid
-                  index={view + 1}
+                  index={shownView + 1}
                   value={value}
                   anchor={anchor}
                   hover={hover}
                   onPick={pick}
                   onHover={setHover}
                 />
-              </div>
+              )}
             </div>
             <button
               type="button"
-              onClick={() => setView((v) => Math.min(v + 1, MAX_VIEW))}
-              disabled={view >= MAX_VIEW}
+              onClick={() => setView(Math.min(shownView + 1, maxView))}
+              disabled={shownView >= maxView}
               aria-label="Bulan berikutnya"
               className="mt-0.5 rounded-md p-1 hover:bg-muted disabled:opacity-30"
             >
@@ -241,3 +262,7 @@ export function DateRangePicker({ value, onChange }: { value: DateRange; onChang
     </div>
   )
 }
+</document_content>
+</document>
+<invoke name="present_files">
+<parameter name="filepaths">["/mnt/user-data/outputs/date-range-picker.tsx"]
