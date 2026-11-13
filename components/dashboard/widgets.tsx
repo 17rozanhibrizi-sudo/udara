@@ -4,10 +4,13 @@ export function PageHeader({
   eyebrow,
   title,
   description,
+  dummy = true,
 }: {
   eyebrow: string
   title: string
   description: string
+  /** false = sembunyikan badge "Data dummy" (halaman yang sudah memakai data nyata) */
+  dummy?: boolean
 }) {
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -16,10 +19,12 @@ export function PageHeader({
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-balance md:text-3xl">{title}</h1>
         <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground text-pretty">{description}</p>
       </div>
-      <span className="hidden w-fit items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-xs font-semibold text-[oklch(0.5_0.13_55)] lg:inline-flex">
-        <span className="size-1.5 rounded-full bg-warning" aria-hidden />
-        Data dummy
-      </span>
+      {dummy && (
+        <span className="hidden w-fit items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-xs font-semibold text-[oklch(0.5_0.13_55)] lg:inline-flex">
+          <span className="size-1.5 rounded-full bg-warning" aria-hidden />
+          Data dummy
+        </span>
+      )}
     </div>
   )
 }
