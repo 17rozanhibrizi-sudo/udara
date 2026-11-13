@@ -40,6 +40,7 @@ function Header() {
       eyebrow="01 · Overview"
       title="Overview Kualitas Udara"
       description="Ringkasan konsentrasi polutan, jumlah hari melampaui baku mutu, dan kategori ISPU per stasiun AQMS."
+      dummy={false}
     />
   )
 }
@@ -91,7 +92,6 @@ function OverviewContent({ db }: { db: OverviewDB }) {
   // Stasiun terpilih yang sudah tidak ada di wilayah/periode ini dianggap tidak terpilih
   const selectedStation = stations.find((s) => s.code === selected)
   const withData = stations.filter((s) => s.hasData)
-  const noData = stations.filter((s) => !s.hasData)
   const chartStations = selectedStation ? withData.filter((s) => s.code === selectedStation.code) : withData
 
   // Ringkasan KPI untuk mode "Semua polutan"
@@ -213,29 +213,14 @@ function OverviewContent({ db }: { db: OverviewDB }) {
           }
         >
           <div className="h-72">
-            <StationMap stations={withData} selected={selected} onSelect={setSelected} />
+            <StationMap stations={stations} selected={selected} onSelect={setSelected} />
           </div>
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
             {ISPU_CATEGORIES.map((c) => (
               <LegendDot key={c.key} color={c.color} label={c.label} />
             ))}
+            {stations.some((s) => !s.hasData) && <LegendDot color="#9ca3af" label="Tanpa data" />}
           </div>
-          {noData.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3 text-[11px] text-muted-foreground">
-              <span>Tanpa data pada periode ini:</span>
-              {noData.map((s) => (
-                <button
-                  key={s.code}
-                  onClick={() => setSelected(s.code === selected ? null : s.code)}
-                  className="rounded-full border px-2 py-0.5 hover:bg-muted"
-                  title={s.fullName}
-                >
-                  {s.name}
-                  {s.status === "Defective" ? " · nonaktif" : ""}
-                </button>
-              ))}
-            </div>
-          )}
           {selectedNotice && (
             <p className="mt-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground" role="status">
               {selectedNotice}
