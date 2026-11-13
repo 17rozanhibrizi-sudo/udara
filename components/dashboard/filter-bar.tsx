@@ -48,7 +48,7 @@ export function FilterBar({ show, note }: { show: FilterKey[]; note?: string }) 
   const f = useFilters()
 
   return (
-    <div className="rounded-xl border bg-card/70 p-3 shadow-xs backdrop-blur">
+    <div className="relative z-30 rounded-xl border bg-card/70 p-3 shadow-xs backdrop-blur">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         {show.includes("region") && (
           <FilterSelect
