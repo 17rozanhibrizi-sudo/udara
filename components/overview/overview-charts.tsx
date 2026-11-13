@@ -2,7 +2,7 @@
 
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
-import { ISPU_CATEGORIES, type Station } from "@/lib/data"
+import { ISPU_CATEGORIES, POLLUTANTS, POLLUTANT_COLORS, type MultiRow, type Pollutant, type Station } from "@/lib/data"
 
 export function DailyTrendChart({
   data,
@@ -28,7 +28,7 @@ export function DailyTrendChart({
           </linearGradient>
         </defs>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
-       <XAxis dataKey="day" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} tickMargin={8} />
+        <XAxis dataKey="day" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} tickMargin={8} />
         <YAxis tickLine={false} axisLine={false} width={44} />
         <ChartTooltip content={<ChartTooltipContent />} />
         <ReferenceLine
@@ -51,11 +51,66 @@ export function DailyTrendChart({
   )
 }
 
+/* Key aman untuk recharts / CSS variable (tanpa titik): "PM2.5" -> "PM25" */
+const SAFE_KEY: Record<Pollutant, string> = {
+  "PM2.5": "PM25",
+  PM10: "PM10",
+  CO: "CO",
+  SO2: "SO2",
+  NO2: "NO2",
+  O3: "O3",
+}
+
+/** Mode "Semua polutan": satu garis per polutan, nilai dalam % baku mutu (100 = tepat di baku mutu) */
+export function MultiTrendChart({ data }: { data: MultiRow[] }) {
+  const config = Object.fromEntries(
+    POLLUTANTS.map((p) => [SAFE_KEY[p.value], { label: p.label, color: POLLUTANT_COLORS[p.value] }]),
+  ) satisfies ChartConfig
+
+  const rows = data.map((r) => {
+    const out: Record<string, string | number | undefined> = { label: r.label }
+    POLLUTANTS.forEach((p) => {
+      out[SAFE_KEY[p.value]] = r[p.value]
+    })
+    return out
+  })
+
+  return (
+    <ChartContainer config={config} className="aspect-auto h-64 w-full">
+      <LineChart data={rows} margin={{ left: -12, right: 8, top: 8 }}>
+        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} tickMargin={8} />
+        <YAxis tickLine={false} axisLine={false} width={48} tickFormatter={(v) => `${v}%`} />
+        <ChartTooltip content={<ChartTooltipContent />} />
+        <ReferenceLine
+          y={100}
+          stroke="var(--chart-4)"
+          strokeDasharray="6 4"
+          strokeWidth={1.5}
+          label={{ value: "BM 100%", position: "insideTopRight", fill: "var(--chart-4)", fontSize: 11 }}
+        />
+        {POLLUTANTS.map((p) => (
+          <Line
+            key={p.value}
+            dataKey={SAFE_KEY[p.value]}
+            type="monotone"
+            stroke={POLLUTANT_COLORS[p.value]}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
+          />
+        ))}
+      </LineChart>
+    </ChartContainer>
+  )
+}
+
 export function ExceedanceChart({
   data,
   active,
 }: {
   data: { pollutant: string; key: string; value: number }[]
+  /** key polutan yang disorot, atau "ALL" untuk menyorot semuanya */
   active: string
 }) {
   const config = { value: { label: "% hari melampaui", color: "var(--chart-1)" } } satisfies ChartConfig
@@ -68,7 +123,7 @@ export function ExceedanceChart({
         <ChartTooltip content={<ChartTooltipContent hideLabel />} />
         <Bar dataKey="value" radius={4} barSize={16}>
           {data.map((d) => (
-            <Cell key={d.key} fill={d.key === active ? "var(--chart-1)" : "var(--subtle)"} />
+            <Cell key={d.key} fill={active === "ALL" || d.key === active ? "var(--chart-1)" : "var(--subtle)"} />
           ))}
           <LabelList dataKey="value" position="right" formatter={(v) => `${v}%`} className="fill-foreground" fontSize={11} />
         </Bar>
