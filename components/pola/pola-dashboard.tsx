@@ -14,6 +14,7 @@ import {
   formatId,
   getHourlySeries,
   getLongestEpisode,
+  getPeriodGranularity,
   getPollutant,
   getStations,
   getScatter,
@@ -22,8 +23,8 @@ import {
 import { CorrelationChart, HourlyChart, ScatterFactorChart, TYPE_COLORS, WeeklyChart } from "./pola-charts"
 
 export function PolaDashboard() {
-  const { region, pollutant, period } = useFilters()
-  const filters = { region, pollutant, period }
+  const { region, pollutant, range } = useFilters()
+  const filters = { region, pollutant, range }
   const [factor, setFactor] = useState(CORRELATIONS[0].factor)
 
   const pol = getPollutant(pollutant)
@@ -36,7 +37,7 @@ export function PolaDashboard() {
   const weekday = 49.2 * scale
   const weekend = 44.3 * scale
   const episode = getLongestEpisode(filters)
-  const isMonthly = period === "semua"
+  const gran = getPeriodGranularity(range)
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:p-8">
@@ -62,8 +63,14 @@ export function PolaDashboard() {
         </Panel>
         <Panel
           className="lg:col-span-4"
-          title={`Pola periodik ${pol.label} per ${isMonthly ? "bulan" : "minggu"}`}
-          subtitle={isMonthly ? "Rentang >4 bulan = per bulan" : "Rentang 15 hari–4 bulan = per minggu"}
+          title={`Pola periodik ${pol.label} per ${gran}`}
+          subtitle={
+            gran === "hari"
+              ? "Rentang ≤14 hari = per hari"
+              : gran === "minggu"
+                ? "Rentang 15 hari–4 bulan = per minggu"
+                : "Rentang >4 bulan = per bulan"
+          }
           footnote="≤14 hari → harian · >4 bulan → bulanan"
         >
           <WeeklyChart data={weekly} />
