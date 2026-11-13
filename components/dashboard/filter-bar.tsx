@@ -3,7 +3,7 @@
 import { FlaskConical, MapPin, RotateCcw, Stethoscope } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DISEASES, POLLUTANTS, REGIONS } from "@/lib/data"
+import { DISEASES, POLLUTANT_OPTIONS, REGIONS, type PollutantSelection } from "@/lib/data"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { useFilters } from "./filter-context"
 
@@ -60,12 +60,12 @@ export function FilterBar({ show, note }: { show: FilterKey[]; note?: string }) 
           />
         )}
         {show.includes("pollutant") && (
-          <FilterSelect
+          <FilterSelect<PollutantSelection>
             label="Polutan"
             icon={<FlaskConical className="size-3" aria-hidden />}
-            value={f.pollutant}
-            onChange={(v) => f.setFilter("pollutant", v)}
-            options={POLLUTANTS.map((p) => ({ value: p.value, label: p.label }))}
+            value={f.pollutant as PollutantSelection}
+            onChange={(v) => f.setFilter("pollutant", v as never)}
+            options={POLLUTANT_OPTIONS}
           />
         )}
         {show.includes("disease") && (
