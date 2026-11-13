@@ -4,7 +4,7 @@ import { FlaskConical, MapPin, RotateCcw, Stethoscope } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DISEASES, POLLUTANTS, REGIONS } from "@/lib/data"
-import { DateRangePicker } from "./date-range-picker"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { useFilters } from "./filter-context"
 
 type FilterKey = "region" | "pollutant" | "period" | "disease"
