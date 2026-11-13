@@ -293,6 +293,82 @@ export function getLongestEpisode(filters: Filters) {
   return { len: best.len, range: best.len === 1 ? a : `${a} – ${b}` }
 }
 
+/* ---------- Opsi "Semua polutan" ---------- */
+
+export type PollutantSelection = Pollutant | "ALL"
+
+export const ALL_POLLUTANTS = "ALL" as const
+
+/** Dipakai dropdown: "Semua polutan" paling atas, lalu satu polutan per item */
+export const POLLUTANT_OPTIONS: { value: PollutantSelection; label: string }[] = [
+  { value: "ALL", label: "Semua polutan" },
+  ...POLLUTANTS.map((p) => ({ value: p.value as PollutantSelection, label: p.label })),
+]
+
+/** Panel yang hanya cocok untuk satu polutan (korelasi, scatter) memakai fallback ini */
+export function resolvePollutant(sel: PollutantSelection): Pollutant {
+  return sel === "ALL" ? "PM2.5" : sel
+}
+
+/** Warna per polutan untuk grafik multi-seri (ganti dengan token warna proyekmu bila ada) */
+export const POLLUTANT_COLORS: Record<Pollutant, string> = {
+  "PM2.5": "#0f766e",
+  PM10: "#2563eb",
+  CO: "#7c3aed",
+  SO2: "#ea580c",
+  NO2: "#db2777",
+  O3: "#65a30d",
+}
+
+type BaseFilters = Omit<Filters, "pollutant">
+
+/** Baris multi-seri: { label: "07", "PM2.5": 74.5, PM10: 58.1, ... } dalam % baku mutu */
+export type MultiRow = { label: string } & Partial<Record<Pollutant, number>>
+
+export function getHourlySeriesAll(base: BaseFilters): MultiRow[] {
+  const perPol = POLLUTANTS.map((p) => ({ p, s: getHourlySeries({ ...base, pollutant: p.value }) }))
+  return perPol[0].s.map((h, i) => {
+    const row: MultiRow = { label: h.hour }
+    perPol.forEach(({ p, s }) => {
+      row[p.value] = round1((s[i].value / p.standard) * 100)
+    })
+    return row
+  })
+}
+
+export function getDailySeriesAll(base: BaseFilters): MultiRow[] {
+  const perPol = POLLUTANTS.map((p) => ({ p, s: getDailySeries({ ...base, pollutant: p.value }) }))
+  return perPol[0].s.map((d, i) => {
+    const row: MultiRow = { label: d.day }
+    perPol.forEach(({ p, s }) => {
+      row[p.value] = round1((s[i].value / p.standard) * 100)
+    })
+    return row
+  })
+}
+
+export function getWeeklySeriesAll(base: BaseFilters): MultiRow[] {
+  const perPol = POLLUTANTS.map((p) => ({ p, s: getWeeklySeries({ ...base, pollutant: p.value }) }))
+  return perPol[0].s.map((w, i) => {
+    const row: MultiRow = { label: w.week }
+    perPol.forEach(({ p, s }) => {
+      row[p.value] = Math.round((s[i].value / p.standard) * 100)
+    })
+    return row
+  })
+}
+
+/** Kartu "Episode terpanjang" untuk mode semua: satu baris per polutan */
+export function getLongestEpisodeAll(base: BaseFilters) {
+  return POLLUTANTS.map((p) => ({
+    pollutant: p.label,
+    key: p.value,
+    ...getLongestEpisode({ ...base, pollutant: p.value }),
+  }))
+}
+
+/* ---------- Korelasi & scatter ---------- */
+
 export const CORRELATIONS = [
   { factor: "Kecepatan angin", r: -0.52, unit: "m/s", min: 0.5, max: 6.2 },
   { factor: "Lalu lintas", r: 0.41, unit: "rb kendaraan/jam", min: 0.5, max: 8 },
