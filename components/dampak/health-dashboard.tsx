@@ -15,11 +15,11 @@ import {
 } from "./health-charts"
 
 export function HealthDashboard() {
-  const { region, pollutant, period, disease } = useFilters()
-  const kpi = getHealthKpis(region, disease)
-  const series = getHealthSeries({ region, pollutant, period }, disease)
-  const totals = getDiseaseTotals(region)
-  const hospitals = getHospitals(region)
+  const { region, pollutant, range, disease } = useFilters()
+  const kpi = getHealthKpis(region, disease, range)
+  const series = getHealthSeries({ region, pollutant, range }, disease)
+  const totals = getDiseaseTotals(region, range)
+  const hospitals = getHospitals(region, range)
   const pol = getPollutant(pollutant)
 
   return (
