@@ -13,6 +13,7 @@ import {
   filterFactor,
   formatId,
   getHourlySeries,
+  getLongestEpisode,
   getPollutant,
   getStations,
   getScatter,
@@ -34,7 +35,8 @@ export function PolaDashboard() {
   const stations = getStations(region)
   const weekday = 49.2 * scale
   const weekend = 44.3 * scale
-  const longest = Math.max(...stations.map((s) => s.episode))
+  const episode = getLongestEpisode(filters)
+  const isMonthly = period === "semua"
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:p-8">
@@ -60,8 +62,8 @@ export function PolaDashboard() {
         </Panel>
         <Panel
           className="lg:col-span-4"
-          title={`Pola periodik ${pol.label} per minggu`}
-          subtitle="Rentang 31 hari = per minggu"
+          title={`Pola periodik ${pol.label} per ${isMonthly ? "bulan" : "minggu"}`}
+          subtitle={isMonthly ? "Rentang >4 bulan = per bulan" : "Rentang 15 hari–4 bulan = per minggu"}
           footnote="≤14 hari → harian · >4 bulan → bulanan"
         >
           <WeeklyChart data={weekly} />
@@ -69,8 +71,8 @@ export function PolaDashboard() {
         <div className="grid gap-4 sm:grid-cols-2 lg:col-span-3 lg:grid-cols-1">
           <KpiCard
             label="Episode terpanjang"
-            value={`${longest} hari`}
-            caption="Berturut-turut di atas BM · 11–19 Okt"
+            value={`${episode.len} hari`}
+            caption={episode.len ? `Berturut-turut di atas BM · ${episode.range}` : "Tidak ada hari di atas BM"}
             tone="danger"
             icon={<Flame className="size-4" aria-hidden />}
           />
