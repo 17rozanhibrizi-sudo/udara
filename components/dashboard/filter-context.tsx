@@ -1,19 +1,19 @@
 "use client"
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react"
-import type { Disease, Period, Pollutant, Region } from "@/lib/data"
+import { DEFAULT_RANGE, type DateRange, type Disease, type Pollutant, type Region } from "@/lib/data"
 
 type FilterState = {
   region: Region
   pollutant: Pollutant
-  period: Period
+  range: DateRange
   disease: Disease
 }
 
 export const DEFAULT_FILTERS: FilterState = {
   region: "kalimantan",
   pollutant: "PM2.5",
-  period: "okt-2025",
+  range: DEFAULT_RANGE,
   disease: "ISPA",
 }
 
@@ -39,7 +39,12 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
       ...state,
       setFilter,
       reset,
-      isDefault: (Object.keys(DEFAULT_FILTERS) as (keyof FilterState)[]).every((k) => state[k] === DEFAULT_FILTERS[k]),
+      isDefault:
+        state.region === DEFAULT_FILTERS.region &&
+        state.pollutant === DEFAULT_FILTERS.pollutant &&
+        state.disease === DEFAULT_FILTERS.disease &&
+        state.range.from === DEFAULT_FILTERS.range.from &&
+        state.range.to === DEFAULT_FILTERS.range.to,
     }),
     [state, setFilter, reset],
   )
