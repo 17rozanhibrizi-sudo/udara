@@ -1,13 +1,15 @@
-export type Region = "nasional" | "kalimantan" | "sumatera" | "jawa"
+export type Region = "nasional" | "sumatera" | "jawa" | "kalimantan" | "sulawesi" | "maluku-papua"
 export type Pollutant = "PM2.5" | "PM10" | "CO" | "SO2" | "NO2" | "O3"
 export type Disease = "ISPA" | "Kardiovaskular" | "Asma darurat" | "PPOK" | "Kematian"
 export type IspuKey = "baik" | "sedang" | "tidakSehat" | "sangat" | "bahaya"
 
 export const REGIONS: { value: Region; label: string; factor: number; yoy: number }[] = [
-  { value: "nasional", label: "Nasional (semua)", factor: 0.86, yoy: 4.8 },
-  { value: "kalimantan", label: "Kalimantan", factor: 1, yoy: 9.6 },
+  { value: "nasional", label: "Nasional (semua)", factor: 0.84, yoy: 4.2 },
   { value: "sumatera", label: "Sumatera", factor: 0.93, yoy: 6.2 },
   { value: "jawa", label: "Jawa", factor: 0.78, yoy: -3.1 },
+  { value: "kalimantan", label: "Kalimantan", factor: 1, yoy: 9.6 },
+  { value: "sulawesi", label: "Sulawesi", factor: 0.72, yoy: 1.8 },
+  { value: "maluku-papua", label: "Maluku & Papua", factor: 0.55, yoy: -2.4 },
 ]
 
 export const POLLUTANTS: {
@@ -175,6 +177,10 @@ export const STATIONS: Station[] = [
   { code: "LOC-JKT-01", name: "Jakarta Pusat", region: "jawa", type: "Urban padat", lat: -6.18, lng: 106.83, avg: 45.4, ispuNow: 108, ispu: [20, 48, 26, 6, 0], yoy: -2, peakHour: "08.00", season: "Jul–Agu", weekdayDiff: "+7,9 (+19%)", episode: 6, factor: "Lalu lintas", r: 0.57, r2: 0.32, completeness: 99 },
   { code: "LOC-BDG-01", name: "Bandung", region: "jawa", type: "Perkotaan", lat: -6.91, lng: 107.61, avg: 36.9, ispuNow: 68, ispu: [32, 46, 18, 4, 0], yoy: -4, peakHour: "08.00", season: "Agu", weekdayDiff: "+6,1 (+18%)", episode: 3, factor: "Lalu lintas", r: 0.49, r2: 0.24, completeness: 97 },
   { code: "LOC-SBY-01", name: "Surabaya", region: "jawa", type: "Industri", lat: -7.25, lng: 112.75, avg: 39.7, ispuNow: 79, ispu: [27, 47, 21, 5, 0], yoy: 1, peakHour: "09.00", season: "Agu–Sep", weekdayDiff: "+5,2 (+14%)", episode: 3, factor: "Industri", r: 0.44, r2: 0.19, completeness: 96 },
+  { code: "LOC-MKS-01", name: "Makassar", region: "sulawesi", type: "Perkotaan", lat: -5.15, lng: 119.43, avg: 38.2, ispuNow: 74, ispu: [29, 45, 20, 6, 0], yoy: 2, peakHour: "07.00", season: "Sep", weekdayDiff: "+5,4 (+14%)", episode: 3, factor: "Lalu lintas", r: 0.46, r2: 0.21, completeness: 96 },
+  { code: "LOC-PLU-01", name: "Palu", region: "sulawesi", type: "Perkotaan", lat: -0.9, lng: 119.87, avg: 34.6, ispuNow: 66, ispu: [34, 46, 16, 4, 0], yoy: -1, peakHour: "08.00", season: "Agu–Sep", weekdayDiff: "+4,1 (+12%)", episode: 2, factor: "Kecepatan angin", r: -0.37, r2: 0.14, completeness: 93 },
+  { code: "LOC-AMQ-01", name: "Ambon", region: "maluku-papua", type: "Pesisir", lat: -3.7, lng: 128.18, avg: 24.8, ispuNow: 38, ispu: [52, 38, 8, 2, 0], yoy: -6, peakHour: "07.00", season: "Agu", weekdayDiff: "+1,6 (+7%)", episode: 1, factor: "Kelembapan", r: -0.28, r2: 0.08, completeness: 89 },
+  { code: "LOC-DJJ-01", name: "Jayapura", region: "maluku-papua", type: "Perkotaan", lat: -2.53, lng: 140.72, avg: 27.3, ispuNow: 47, ispu: [47, 41, 9, 3, 0], yoy: 2, peakHour: "08.00", season: "Sep", weekdayDiff: "+2,2 (+9%)", episode: 1, factor: "Lalu lintas", r: 0.33, r2: 0.11, completeness: 88 },
 ]
 
 export function getStations(region: Region) {
@@ -487,6 +493,10 @@ export const HOSPITALS: Hospital[] = [
   { code: "RS-PLM-A", name: "Kota Palembang", region: "sumatera", station: "LOC-PLM-01", capacity: "Tipe A · 420 TT", dominantPollutant: "PM2.5 (1,0× BM)", total: 655, dominantDisease: "ISPA", share: [55, 22, 10, 10, 3] },
   { code: "RS-JKT-A", name: "Kota Jakarta Pusat", region: "jawa", station: "LOC-JKT-01", capacity: "Tipe B · 250 TT", dominantPollutant: "PM2.5 (0,9× BM)", total: 904, dominantDisease: "ISPA", share: [48, 28, 11, 10, 3] },
   { code: "RS-SBY-A", name: "Kota Surabaya", region: "jawa", station: "LOC-SBY-01", capacity: "Tipe A · 480 TT", dominantPollutant: "NO₂ (0,9× BM)", total: 712, dominantDisease: "Kardiovaskular", share: [34, 38, 12, 13, 3] },
+  { code: "RS-MKS-A", name: "Kota Makassar", region: "sulawesi", station: "LOC-MKS-01", capacity: "Tipe A · 450 TT", dominantPollutant: "PM2.5 (0,7× BM)", total: 690, dominantDisease: "ISPA", share: [52, 25, 10, 10, 3] },
+  { code: "RS-PLU-A", name: "Kota Palu", region: "sulawesi", station: "LOC-PLU-01", capacity: "Tipe B · 200 TT", dominantPollutant: "PM2.5 (0,6× BM)", total: 402, dominantDisease: "ISPA", share: [58, 18, 9, 12, 3] },
+  { code: "RS-AMQ-A", name: "Kota Ambon", region: "maluku-papua", station: "LOC-AMQ-01", capacity: "Tipe B · 180 TT", dominantPollutant: "PM2.5 (0,5× BM)", total: 310, dominantDisease: "ISPA", share: [60, 17, 9, 11, 3] },
+  { code: "RS-DJJ-A", name: "Kota Jayapura", region: "maluku-papua", station: "LOC-DJJ-01", capacity: "Tipe B · 210 TT", dominantPollutant: "PM2.5 (0,5× BM)", total: 355, dominantDisease: "ISPA", share: [59, 18, 9, 11, 3] },
 ]
 
 export function getHospitals(region: Region, range: DateRange = DEFAULT_RANGE) {
@@ -506,10 +516,12 @@ export const EVAL_KPIS: Record<
   Region,
   { completeness: number; stations: number; blindSpot: string; blindNote: string; distance: number; ratio: number; ratioPct: number }
 > = {
-  nasional: { completeness: 94.6, stations: 27, blindSpot: "Kab. Kotawaringin Timur (Sampit)", blindNote: "Beban pasien RS tinggi di area gambut dengan cakupan pemantauan terbatas", distance: 38.4, ratio: 1.58, ratioPct: 58 },
+  nasional: { completeness: 93.9, stations: 34, blindSpot: "Kab. Kotawaringin Timur (Sampit)", blindNote: "Beban pasien RS tinggi di area gambut dengan cakupan pemantauan terbatas", distance: 38.4, ratio: 1.58, ratioPct: 58 },
   kalimantan: { completeness: 92.8, stations: 9, blindSpot: "Kab. Kotawaringin Timur (Sampit)", blindNote: "Satu stasiun melayani 541 kasus RS di wilayah gambut luas", distance: 52.1, ratio: 1.84, ratioPct: 84 },
   sumatera: { completeness: 93.5, stations: 8, blindSpot: "Kab. Kampar (Riau)", blindNote: "Titik api berulang tanpa sensor dalam radius 60 km", distance: 41.7, ratio: 1.71, ratioPct: 71 },
   jawa: { completeness: 97.9, stations: 10, blindSpot: "Kab. Bekasi", blindNote: "Kawasan industri padat dengan cakupan stasiun terbatas", distance: 18.2, ratio: 1.27, ratioPct: 27 },
+  sulawesi: { completeness: 94.1, stations: 4, blindSpot: "Kab. Morowali (Sulawesi Tengah)", blindNote: "Kawasan industri nikel tanpa stasiun dalam radius 70 km", distance: 46.3, ratio: 1.38, ratioPct: 38 },
+  "maluku-papua": { completeness: 90.2, stations: 3, blindSpot: "Kab. Merauke (Papua Selatan)", blindNote: "Kebakaran lahan luas dengan satu sensor untuk ratusan kilometer", distance: 118.5, ratio: 1.22, ratioPct: 22 },
 }
 
 export type NetworkPoint = { name: string; lat: number; lng: number; region: Exclude<Region, "nasional"> }
@@ -542,6 +554,13 @@ export const NETWORK_STATIONS: NetworkPoint[] = [
   { name: "Balikpapan", lat: -1.24, lng: 116.85, region: "kalimantan" },
   { name: "Samarinda", lat: -0.5, lng: 117.15, region: "kalimantan" },
   { name: "Tarakan", lat: 3.3, lng: 117.63, region: "kalimantan" },
+  { name: "Makassar", lat: -5.15, lng: 119.43, region: "sulawesi" },
+  { name: "Palu", lat: -0.9, lng: 119.87, region: "sulawesi" },
+  { name: "Manado", lat: 1.47, lng: 124.84, region: "sulawesi" },
+  { name: "Kendari", lat: -3.97, lng: 122.51, region: "sulawesi" },
+  { name: "Ambon", lat: -3.7, lng: 128.18, region: "maluku-papua" },
+  { name: "Sorong", lat: -0.88, lng: 131.26, region: "maluku-papua" },
+  { name: "Jayapura", lat: -2.53, lng: 140.72, region: "maluku-papua" },
 ]
 
 export const PROPOSED_STATIONS: NetworkPoint[] = [
@@ -549,6 +568,8 @@ export const PROPOSED_STATIONS: NetworkPoint[] = [
   { name: "Usulan · Ketapang", lat: -1.85, lng: 110.0, region: "kalimantan" },
   { name: "Usulan · Kampar", lat: 0.3, lng: 100.9, region: "sumatera" },
   { name: "Usulan · Bekasi", lat: -6.3, lng: 107.15, region: "jawa" },
+  { name: "Usulan · Morowali", lat: -2.8, lng: 121.9, region: "sulawesi" },
+  { name: "Usulan · Merauke", lat: -8.49, lng: 140.4, region: "maluku-papua" },
 ]
 
 export const EVAL_TABLE: {
@@ -566,6 +587,8 @@ export const EVAL_TABLE: {
   { region: "sumatera", area: "Kota Pekanbaru (Marpoyan Damai)", type: "Perkotaan & gambut", stations: "1 stasiun", cases: "812", beds: "220 TT (Tipe B)", pm: "58,6 vs 35,0 µg/m³ (1,67×)", status: "Kritis", action: "Protokol kabut asap & perluasan ruang rawat ISPA" },
   { region: "kalimantan", area: "Kota Palangka Raya", type: "Perkotaan", stations: "1 stasiun", cases: "738", beds: "220 TT (Tipe B)", pm: "55,8 vs 30,0 µg/m³ (1,86×)", status: "Waspada", action: "Sensor low-cost pendamping di area pinggiran kota" },
   { region: "jawa", area: "Kota Jakarta Pusat (Gambir)", type: "Pusat pemerintahan & urban", stations: "1 stasiun", cases: "904", beds: "250 TT (Tipe B)", pm: "45,4 vs 37,5 µg/m³ (1,21×)", status: "Waspada", action: "Pembatasan emisi lalu lintas jam sibuk pagi" },
+  { region: "sulawesi", area: "Kab. Morowali (Sulawesi Tengah)", type: "Industri", stations: "0 stasiun", cases: "264", beds: "90 TT (Tipe C)", pm: "41,8 vs 30,0 µg/m³ (1,39×)", status: "Waspada", action: "Pasang stasiun AQMS di kawasan industri & pantau emisi" },
+  { region: "maluku-papua", area: "Kab. Merauke (Papua Selatan)", type: "Lahan terbuka", stations: "0 stasiun", cases: "148", beds: "80 TT (Tipe C)", pm: "33,5 vs 30,0 µg/m³ (1,12×)", status: "Waspada", action: "Sensor low-cost & peringatan dini kebakaran lahan" },
 ]
 
 export const RECOMMENDATIONS = [
