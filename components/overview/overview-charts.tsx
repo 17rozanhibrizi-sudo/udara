@@ -28,7 +28,7 @@ export function DailyTrendChart({
           </linearGradient>
         </defs>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
-        <XAxis dataKey="day" tickLine={false} axisLine={false} interval={4} tickMargin={8} />
+       <XAxis dataKey="day" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={28} tickMargin={8} />
         <YAxis tickLine={false} axisLine={false} width={44} />
         <ChartTooltip content={<ChartTooltipContent />} />
         <ReferenceLine
