@@ -12,7 +12,7 @@ import {
   getDailySeries,
   getExceedance,
   getOverviewKpis,
-  getPeriod,
+  formatRangeShort,
   getPollutant,
   getRegion,
   getStations,
@@ -20,15 +20,14 @@ import {
 import { DailyTrendChart, ExceedanceChart, IspuDistributionChart, YoyChart } from "./overview-charts"
 
 export function OverviewDashboard() {
-  const { region, pollutant, period } = useFilters()
+  const { region, pollutant, range } = useFilters()
   const [selected, setSelected] = useState<string | null>(null)
-  const filters = { region, pollutant, period }
+  const filters = { region, pollutant, range }
 
   const pol = getPollutant(pollutant)
   const reg = getRegion(region)
-  const per = getPeriod(period)
   const kpi = getOverviewKpis(filters)
-  const daily = useMemo(() => getDailySeries({ region, pollutant, period }), [region, pollutant, period])
+  const daily = useMemo(() => getDailySeries({ region, pollutant, range }), [region, pollutant, range])
   const exceed = getExceedance(filters)
   const stations = getStations(region)
   const tableStations = selected ? stations.filter((s) => s.code === selected) : stations
@@ -48,7 +47,7 @@ export function OverviewDashboard() {
         <KpiCard
           label={`Rata-rata ${pol.label} (µg/m³)`}
           value={formatId(kpi.avg)}
-          caption={`${reg.label} · ${per.short}`}
+          caption={`${reg.label} · ${formatRangeShort(range)}`}
           icon={<Gauge className="size-4" aria-hidden />}
         />
         <KpiCard
