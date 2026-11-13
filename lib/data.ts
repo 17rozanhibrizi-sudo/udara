@@ -24,22 +24,26 @@ export const POLLUTANTS: {
   { value: "CO", label: "CO", standard: 4000, ratio: 0.42, exceed: 1 },
   { value: "SO2", label: "SO₂", standard: 75, ratio: 0.48, exceed: 2 },
   { value: "NO2", label: "NO₂", standard: 65, ratio: 0.55, exceed: 4 },
-  { value: "O3", label: "O₃", standard: 150, ratio: 0.6, exceed: 6 },
+  { value: "O3", label: "O₃", standard: 100, ratio: 0.6, exceed: 6 },
 ]
 
 /* ---------- Rentang tanggal (kalender) ---------- */
 
 export type DateRange = { from: string; to: string } // ISO yyyy-mm-dd
 
-/** Periode observasi data dummy (nanti diganti dari metadata_dates.csv) */
-export const DATA_MIN = "2025-08-01"
-export const DATA_MAX = "2025-10-31"
-export const DEFAULT_RANGE: DateRange = { from: "2025-10-01", to: "2025-10-31" }
+/** Periode observasi data nyata (03_aqms_daily_ispu.csv) */
+export const DATA_MIN = "2024-01-01"
+export const DATA_MAX = "2026-10-14"
+
+const lastNDays = (n: number): DateRange => ({ from: toISO(addDays(parseISO(DATA_MAX), -(n - 1))), to: DATA_MAX })
+
+export const DEFAULT_RANGE: DateRange = lastNDays(30)
 
 export const RANGE_PRESETS: { label: string; range: DateRange }[] = [
+  { label: "30 hari terakhir", range: lastNDays(30) },
+  { label: "90 hari terakhir", range: lastNDays(90) },
   { label: "Oktober 2025", range: { from: "2025-10-01", to: "2025-10-31" } },
-  { label: "September 2025", range: { from: "2025-09-01", to: "2025-09-30" } },
-  { label: "Agustus 2025", range: { from: "2025-08-01", to: "2025-08-31" } },
+  { label: "Tahun 2025", range: { from: "2025-01-01", to: "2025-12-31" } },
   { label: "Semua periode", range: { from: DATA_MIN, to: DATA_MAX } },
 ]
 
