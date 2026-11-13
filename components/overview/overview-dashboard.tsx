@@ -7,91 +7,152 @@ import { useFilters } from "@/components/dashboard/filter-context"
 import { KpiCard, LegendDot, PageHeader, Panel } from "@/components/dashboard/widgets"
 import { StationMap } from "@/components/maps"
 import {
+  DEFAULT_RANGE,
   ISPU_CATEGORIES,
   POLLUTANTS,
   POLLUTANT_COLORS,
   formatId,
   formatRangeShort,
+  getPollutant,
+  getRegion,
+  resolvePollutant,
+  type PollutantSelection,
+} from "@/lib/data"
+import {
+  STANDARD_WINDOW,
   getDailySeries,
   getDailySeriesAll,
   getExceedance,
   getOverviewKpis,
-  getPollutant,
-  getRegion,
-  getStations,
-  resolvePollutant,
-  type PollutantSelection,
-} from "@/lib/data"
+  getOverviewStations,
+  previousYearRange,
+  type OverviewDB,
+} from "@/lib/overview-data"
+import { useOverviewData } from "@/lib/use-overview-data"
 import { DailyTrendChart, ExceedanceChart, IspuDistributionChart, MultiTrendChart, YoyChart } from "./overview-charts"
 
+const mean = (v: number[]) => v.reduce((a, b) => a + b, 0) / Math.max(v.length, 1)
+const fmtCount = (n: number) => formatId(n, Number.isInteger(n) ? 0 : 1)
+
+function Header() {
+  return (
+    <PageHeader
+      eyebrow="01 · Overview"
+      title="Overview Kualitas Udara"
+      description="Ringkasan konsentrasi polutan, jumlah hari melampaui baku mutu, dan kategori ISPU per stasiun AQMS."
+    />
+  )
+}
+
 export function OverviewDashboard() {
+  const { db, error, loading } = useOverviewData()
+
+  if (db) return <OverviewContent db={db} />
+
+  return (
+    <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:p-8">
+      <Header />
+      <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground" role="status">
+        {loading ? "Memuat data kualitas udara…" : `Data tidak dapat dimuat. ${error ?? ""}`}
+      </div>
+    </div>
+  )
+}
+
+function OverviewContent({ db }: { db: OverviewDB }) {
   const { region, pollutant: rawSelection, range } = useFilters()
   const selection = rawSelection as PollutantSelection
   const isAll = selection === "ALL"
   // Panel/hitungan yang hanya cocok untuk satu polutan memakai PM2.5 saat "Semua polutan"
   const pollutant = resolvePollutant(selection)
   const [selected, setSelected] = useState<string | null>(null)
-  const filters = { region, pollutant, range }
 
   const pol = getPollutant(pollutant)
   const reg = getRegion(region)
-  const kpi = getOverviewKpis(filters)
-  const daily = useMemo(() => getDailySeries({ region, pollutant, range }), [region, pollutant, range])
-  const dailyAll = useMemo(() => (isAll ? getDailySeriesAll({ region, range }) : []), [isAll, region, range])
+  const prevRange = useMemo(() => previousYearRange(range), [range])
+
+  const kpi = useMemo(() => getOverviewKpis(db, { region, pollutant, range }), [db, region, pollutant, range])
+  const daily = useMemo(() => getDailySeries(db, { region, pollutant, range }), [db, region, pollutant, range])
+  const dailyAll = useMemo(
+    () => (isAll ? getDailySeriesAll(db, { region, range }) : []),
+    [db, isAll, region, range],
+  )
   const allKpis = useMemo(
     () =>
-      isAll
-        ? POLLUTANTS.map((p) => ({ p, ...getOverviewKpis({ region, pollutant: p.value, range }) }))
-        : [],
-    [isAll, region, range],
+      isAll ? POLLUTANTS.map((p) => ({ p, ...getOverviewKpis(db, { region, pollutant: p.value, range }) })) : [],
+    [db, isAll, region, range],
   )
-  const exceed = getExceedance(filters)
-  const stations = getStations(region)
-  const tableStations = selected ? stations.filter((s) => s.code === selected) : stations
+  const exceed = useMemo(() => getExceedance(db, { region, range }), [db, region, range])
+  const stations = useMemo(
+    () => getOverviewStations(db, region, range, selection),
+    [db, region, range, selection],
+  )
+
+  // Stasiun terpilih yang sudah tidak ada di wilayah/periode ini dianggap tidak terpilih
   const selectedStation = stations.find((s) => s.code === selected)
+  const withData = stations.filter((s) => s.hasData)
+  const noData = stations.filter((s) => !s.hasData)
+  const chartStations = selectedStation ? withData.filter((s) => s.code === selectedStation.code) : withData
 
   // Ringkasan KPI untuk mode "Semua polutan"
-  const mean = (v: number[]) => v.reduce((a, b) => a + b, 0) / Math.max(v.length, 1)
-  const avgPct = isAll ? mean(allKpis.map((k) => (k.avg / k.p.standard) * 100)) : 0
-  const worstDays = isAll ? allKpis.reduce((a, b) => (b.above > a.above ? b : a), allKpis[0]) : null
-  const yoy = isAll ? Math.round(mean(allKpis.map((k) => k.yoy)) * 10) / 10 : kpi.yoy
-  const worse = yoy >= 0
+  const okAll = allKpis.filter((k) => k.avg != null)
+  const avgPct = isAll && okAll.length ? mean(okAll.map((k) => ((k.avg as number) / k.p.standard) * 100)) : null
+  const worst = isAll
+    ? allKpis.reduce<(typeof allKpis)[number] | null>(
+        (a, b) => (b.above != null && (a == null || a.above == null || b.above > a.above) ? b : a),
+        null,
+      )
+    : null
+  const yoyAll = isAll ? allKpis.map((k) => k.yoy).filter((v): v is number => v != null) : []
+  const yoy: number | null = isAll ? (yoyAll.length ? Math.round(mean(yoyAll) * 10) / 10 : null) : kpi.yoy
+  const worse = (yoy ?? 0) >= 0
+  const stationCount = kpi.stationCount
+
+  const selectedNotice = selectedStation && !selectedStation.hasData
+    ? selectedStation.status === "Defective"
+      ? `${selectedStation.fullName}: stasiun rusak/nonaktif, tidak ada data yang tersedia.`
+      : `${selectedStation.fullName}: tidak ada data pada rentang tanggal ini.`
+    : null
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:p-8">
-      <PageHeader
-        eyebrow="01 · Overview"
-        title="Overview Kualitas Udara"
-        description="Ringkasan konsentrasi polutan, jumlah hari melampaui baku mutu, dan kategori ISPU per stasiun AQMS."
-      />
-      <FilterBar show={["region", "pollutant", "period"]} note="Default = Kalimantan, PM2.5, Oktober 2025" />
+      <Header />
+      <FilterBar show={["region", "pollutant", "period"]} note={`Default = Kalimantan, PM2.5, ${formatRangeShort(DEFAULT_RANGE)}`} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         {isAll ? (
           <KpiCard
             label="Rata-rata terhadap baku mutu"
-            value={`${formatId(avgPct)}%`}
+            value={avgPct == null ? "–" : `${formatId(avgPct)}%`}
             caption={`6 polutan · ${reg.label} · ${formatRangeShort(range)}`}
             icon={<Gauge className="size-4" aria-hidden />}
           />
         ) : (
           <KpiCard
             label={`Rata-rata ${pol.label} (µg/m³)`}
-            value={formatId(kpi.avg)}
+            value={kpi.avg == null ? "–" : formatId(kpi.avg)}
             caption={`${reg.label} · ${formatRangeShort(range)}`}
             icon={<Gauge className="size-4" aria-hidden />}
           />
         )}
-        {isAll && worstDays ? (
+        {isAll ? (
           <KpiCard
             label="Hari di atas baku mutu (terbanyak)"
             value={
-              <>
-                {worstDays.above}{" "}
-                <span className="text-lg font-semibold text-muted-foreground">dari {worstDays.days} hari</span>
-              </>
+              worst && worst.above != null ? (
+                <>
+                  {fmtCount(worst.above)}{" "}
+                  <span className="text-lg font-semibold text-muted-foreground">dari {worst.days} hari</span>
+                </>
+              ) : (
+                "–"
+              )
             }
-            caption={`Polutan terbanyak: ${worstDays.p.label} · rata-rata ${stations.length} stasiun`}
+            caption={
+              worst && worst.above != null
+                ? `Polutan terbanyak: ${worst.p.label} · rata-rata ${worst.stationCount} stasiun`
+                : "Tidak ada stasiun berdata"
+            }
             tone="warning"
             icon={<CalendarClock className="size-4" aria-hidden />}
           />
@@ -99,11 +160,16 @@ export function OverviewDashboard() {
           <KpiCard
             label="Hari di atas baku mutu"
             value={
-              <>
-                {kpi.above} <span className="text-lg font-semibold text-muted-foreground">dari {kpi.days} hari</span>
-              </>
+              kpi.above == null ? (
+                "–"
+              ) : (
+                <>
+                  {fmtCount(kpi.above)}{" "}
+                  <span className="text-lg font-semibold text-muted-foreground">dari {kpi.days} hari</span>
+                </>
+              )
             }
-            caption={`Rata-rata ${stations.length} stasiun · BM 24 jam: ${pol.standard.toLocaleString("id-ID")} µg/m³`}
+            caption={`Rata-rata ${stationCount} stasiun · BM ${STANDARD_WINDOW[pollutant]}: ${pol.standard.toLocaleString("id-ID")} µg/m³`}
             tone="warning"
             icon={<CalendarClock className="size-4" aria-hidden />}
           />
@@ -111,16 +177,22 @@ export function OverviewDashboard() {
         <KpiCard
           label="Perubahan YoY"
           value={
-            <span className="inline-flex items-center gap-2">
-              {worse ? <TrendingUp className="size-6" aria-hidden /> : <TrendingDown className="size-6" aria-hidden />}
-              {formatId(Math.abs(yoy))}%
-              <span className="text-lg font-semibold">{worse ? "lebih buruk" : "lebih baik"}</span>
-            </span>
+            yoy == null ? (
+              "n/a"
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                {worse ? <TrendingUp className="size-6" aria-hidden /> : <TrendingDown className="size-6" aria-hidden />}
+                {formatId(Math.abs(yoy))}%
+                <span className="text-lg font-semibold">{worse ? "lebih buruk" : "lebih baik"}</span>
+              </span>
+            )
           }
           caption={
-            isAll ? "Rata-rata 6 polutan dibanding periode yang sama tahun 2024" : "Dibanding periode yang sama tahun 2024"
+            yoy == null
+              ? `Pembanding (${formatRangeShort(prevRange)}) belum tersedia`
+              : `${isAll ? "Rata-rata 6 polutan" : "Stasiun berdata di kedua periode"} dibanding ${formatRangeShort(prevRange)}`
           }
-          tone={worse ? "danger" : "success"}
+          tone={yoy == null ? undefined : worse ? "danger" : "success"}
         />
       </div>
 
@@ -141,13 +213,34 @@ export function OverviewDashboard() {
           }
         >
           <div className="h-72">
-            <StationMap stations={stations} selected={selected} onSelect={setSelected} />
+            <StationMap stations={withData} selected={selected} onSelect={setSelected} />
           </div>
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
             {ISPU_CATEGORIES.map((c) => (
               <LegendDot key={c.key} color={c.color} label={c.label} />
             ))}
           </div>
+          {noData.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3 text-[11px] text-muted-foreground">
+              <span>Tanpa data pada periode ini:</span>
+              {noData.map((s) => (
+                <button
+                  key={s.code}
+                  onClick={() => setSelected(s.code === selected ? null : s.code)}
+                  className="rounded-full border px-2 py-0.5 hover:bg-muted"
+                  title={s.fullName}
+                >
+                  {s.name}
+                  {s.status === "Defective" ? " · nonaktif" : ""}
+                </button>
+              ))}
+            </div>
+          )}
+          {selectedNotice && (
+            <p className="mt-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground" role="status">
+              {selectedNotice}
+            </p>
+          )}
         </Panel>
         <Panel
           className="lg:col-span-3"
@@ -158,7 +251,7 @@ export function OverviewDashboard() {
           }
           subtitle={
             isAll
-              ? "100% = tepat di baku mutu 24 jam masing-masing polutan"
+              ? "100% = tepat di baku mutu masing-masing polutan"
               : "AQMS harian, rata-rata stasiun di wilayah terpilih"
           }
           action={
@@ -179,7 +272,12 @@ export function OverviewDashboard() {
           {isAll ? (
             <MultiTrendChart data={dailyAll} />
           ) : (
-            <DailyTrendChart data={daily} standard={pol.standard} label={pol.label} />
+            <DailyTrendChart
+              data={daily}
+              standard={pol.standard}
+              label={pol.label}
+              standardLabel={`Baku mutu ${STANDARD_WINDOW[pollutant]}`}
+            />
           )}
         </Panel>
       </div>
@@ -187,15 +285,23 @@ export function OverviewDashboard() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel
           title="Polutan vs baku mutu"
-          subtitle="% hari melampaui baku mutu"
+          subtitle="% hari-stasiun melampaui baku mutu"
           footnote={
-            isAll ? "Menampilkan 6 polutan sekaligus" : `Menampilkan 6 polutan; polutan terpilih (${pol.label}) disorot`
+            (isAll ? "Menampilkan 6 polutan sekaligus" : `Menampilkan 6 polutan; polutan terpilih (${pol.label}) disorot`) +
+            ". CO & O₃ dibandingkan dengan baku mutu 8 jam memakai rata-rata harian (pendekatan)."
           }
         >
           <ExceedanceChart data={exceed} active={isAll ? "ALL" : pollutant} />
         </Panel>
-        <Panel title="Distribusi kategori ISPU per stasiun" subtitle="Proporsi hari (0–100%)">
-          <IspuDistributionChart stations={tableStations} />
+        <Panel
+          title="Distribusi kategori ISPU per stasiun"
+          subtitle={
+            isAll
+              ? "Proporsi hari (0–100%) · sub-indeks tertinggi dari 6 polutan"
+              : `Proporsi hari (0–100%) · sub-indeks ${pol.label}`
+          }
+        >
+          <IspuDistributionChart stations={chartStations} />
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5">
             {ISPU_CATEGORIES.map((c) => (
               <LegendDot key={c.key} color={c.color} label={c.label} shape="square" />
@@ -204,10 +310,10 @@ export function OverviewDashboard() {
         </Panel>
         <Panel
           title="Perubahan konsentrasi YoY per stasiun"
-          subtitle="Kanan (+) memburuk · kiri (−) membaik"
-          footnote="Garis acuan 0%"
+          subtitle={`Kanan (+) memburuk · kiri (−) membaik${isAll ? " · acuan PM2.5" : ""}`}
+          footnote="Garis acuan 0% · stasiun tanpa data di kedua periode tidak ditampilkan"
         >
-          <YoyChart stations={tableStations} />
+          <YoyChart stations={chartStations} />
         </Panel>
       </div>
     </div>
