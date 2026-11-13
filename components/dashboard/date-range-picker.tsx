@@ -262,7 +262,3 @@ export function DateRangePicker({ value, onChange }: { value: DateRange; onChang
     </div>
   )
 }
-</document_content>
-</document>
-<invoke name="present_files">
-<parameter name="filepaths">["/mnt/user-data/outputs/date-range-picker.tsx"]
