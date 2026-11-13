@@ -6,7 +6,7 @@ import { useFilters } from "@/components/dashboard/filter-context"
 import { KpiCard, LegendDot, PageHeader, Panel } from "@/components/dashboard/widgets"
 import { NetworkMap } from "@/components/maps"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { EVAL_KPIS, EVAL_TABLE, NETWORK_STATIONS, PROPOSED_STATIONS, RECOMMENDATIONS, formatId } from "@/lib/data"
+import { caseScale, EVAL_KPIS, EVAL_TABLE, NETWORK_STATIONS, PROPOSED_STATIONS, RECOMMENDATIONS, formatId } from "@/lib/data"
 import { cn } from "@/lib/utils"
 
 const toneStyles = {
@@ -16,7 +16,8 @@ const toneStyles = {
 }
 
 export function EvaluasiDashboard() {
-  const { region } = useFilters()
+  const { region, range } = useFilters()
+  const cs = caseScale(range)
   const kpi = EVAL_KPIS[region]
   const byRegion = <T extends { region: string }>(list: T[]) =>
     region === "nasional" ? list : list.filter((x) => x.region === region)
@@ -100,7 +101,7 @@ export function EvaluasiDashboard() {
                     <TableCell className="font-medium whitespace-normal">{r.area}</TableCell>
                     <TableCell className="whitespace-normal">{r.type}</TableCell>
                     <TableCell>{r.stations}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.cases} kasus</TableCell>
+                    <TableCell className="text-right tabular-nums">{Math.round(Number(r.cases.replace(/\./g, "")) * cs).toLocaleString("id-ID")} kasus</TableCell>
                     <TableCell>{r.beds}</TableCell>
                     <TableCell className="tabular-nums whitespace-normal">{r.pm}</TableCell>
                     <TableCell className="whitespace-normal">
