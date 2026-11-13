@@ -1,9 +1,10 @@
 "use client"
 
-import { CalendarDays, FlaskConical, MapPin, RotateCcw, Stethoscope } from "lucide-react"
+import { FlaskConical, MapPin, RotateCcw, Stethoscope } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DISEASES, PERIODS, POLLUTANTS, REGIONS } from "@/lib/data"
+import { DISEASES, POLLUTANTS, REGIONS } from "@/lib/data"
+import { DateRangePicker } from "./date-range-picker"
 import { useFilters } from "./filter-context"
 
 type FilterKey = "region" | "pollutant" | "period" | "disease"
@@ -76,15 +77,7 @@ export function FilterBar({ show, note }: { show: FilterKey[]; note?: string }) 
             options={DISEASES.map((d) => ({ value: d.value, label: d.value === "ISPA" ? "ISPA / Pernapasan" : d.value }))}
           />
         )}
-        {show.includes("period") && (
-          <FilterSelect
-            label="Tanggal"
-            icon={<CalendarDays className="size-3" aria-hidden />}
-            value={f.period}
-            onChange={(v) => f.setFilter("period", v)}
-            options={PERIODS.map((p) => ({ value: p.value, label: p.label }))}
-          />
-        )}
+        {show.includes("period") && <DateRangePicker value={f.range} onChange={(v) => f.setFilter("range", v)} />}
         <div className="flex items-center gap-3 sm:ml-auto">
           {note && <p className="hidden max-w-48 text-[11px] leading-snug text-muted-foreground xl:block">{note}</p>}
           <Button variant="outline" className="h-9" onClick={f.reset} disabled={f.isDefault}>
