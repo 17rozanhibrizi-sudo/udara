@@ -14,7 +14,7 @@ export const NAV_ITEMS = [
 ]
 
 /** Halaman yang sudah memakai data nyata. Tambahkan href lain di sini saat halamannya selesai dikerjakan. */
-const LIVE_PAGES = ["/overview", "/pola-faktor", "/dampak-kesehatan"]
+const LIVE_PAGES = ["/overview", "/pola-faktor", "/dampak-kesehatan", "/evaluasi"]
 
 function Logo() {
   return (
