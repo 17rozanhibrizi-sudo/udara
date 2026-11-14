@@ -22,13 +22,13 @@ export const DEFAULT_FILTERS: FilterState = {
  * Kondisi setelah tombol [Reset filter] sesuai spesifikasi:
  * Semua Wilayah, Semua Polutan, seluruh periode observasi.
  * "ALL" sudah didukung di runtime (POLLUTANT_OPTIONS + resolvePollutant); cast dipakai agar tipe Pollutant halaman lain tidak berubah.
- * Penyakit: belum ada opsi "Semua Penyakit" di DISEASES, jadi tetap ISPA sampai halaman Dampak Kesehatan dikerjakan.
+ * Penyakit: "Semua Penyakit" ("ALL", lihat DISEASE_OPTIONS di lib/data.ts); cast dipakai agar tipe Disease tidak berubah.
  */
 export const RESET_FILTERS: FilterState = {
   region: "nasional",
   pollutant: "ALL" as unknown as Pollutant,
   range: { from: DATA_MIN, to: DATA_MAX },
-  disease: "ISPA",
+  disease: "ALL" as unknown as Disease,
 }
 
 type FilterContextValue = FilterState & {
