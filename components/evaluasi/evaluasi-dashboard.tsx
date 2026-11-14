@@ -1,13 +1,38 @@
 "use client"
 
-import { CheckCircle2, EyeOff, Hospital, Ratio } from "lucide-react"
+import { useMemo } from "react"
+import { CheckCircle2, EyeOff, Ratio } from "lucide-react"
 import { FilterBar } from "@/components/dashboard/filter-bar"
 import { useFilters } from "@/components/dashboard/filter-context"
 import { KpiCard, LegendDot, PageHeader, Panel } from "@/components/dashboard/widgets"
-import { NetworkMap } from "@/components/maps"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { caseScale, EVAL_KPIS, EVAL_TABLE, NETWORK_STATIONS, PROPOSED_STATIONS, RECOMMENDATIONS, formatId } from "@/lib/data"
+import { formatId } from "@/lib/data"
+import {
+  COMPLETENESS_GOOD,
+  COMPLETENESS_MIN,
+  COVERAGE_KM,
+  RATIO_CRITICAL,
+  RATIO_WATCH,
+  computeRows,
+  getActionPlan,
+  getKpis,
+  getProposals,
+  stationsInRegion,
+  type EvalDB,
+  type Level,
+  type WilayahRow,
+} from "@/lib/evaluasi-data"
+import { useEvaluasiData } from "@/lib/use-evaluasi-data"
 import { cn } from "@/lib/utils"
+import { EvaluasiMap } from "./evaluasi-map"
+
+const levelStyle: Record<Level, string> = {
+  Kritis: "bg-destructive/10 text-destructive",
+  Waspada: "bg-warning/15 text-[oklch(0.5_0.13_55)]",
+  Terpantau: "bg-success/10 text-success",
+  Nonaktif: "bg-muted text-muted-foreground",
+  "Tanpa data": "bg-muted text-muted-foreground",
+}
 
 const toneStyles = {
   success: { bar: "bg-success", chip: "bg-success/10 text-success" },
@@ -15,107 +40,138 @@ const toneStyles = {
   warning: { bar: "bg-warning", chip: "bg-warning/15 text-[oklch(0.5_0.13_55)]" },
 }
 
+function Header() {
+  return (
+    <PageHeader
+      eyebrow="04 · Evaluasi & Rekomendasi"
+      title="Evaluasi Jaringan & Rekomendasi Kebijakan"
+      description="Menilai keandalan jaringan AQMS, celah cakupan pemantauan terhadap beban kesehatan, dan langkah kebijakan yang diusulkan."
+      dummy={false}
+    />
+  )
+}
+
 export function EvaluasiDashboard() {
+  const { db, error, loading } = useEvaluasiData()
+  if (db) return <EvaluasiContent db={db} />
+  return (
+    <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:p-8">
+      <Header />
+      <div className="rounded-xl border bg-card p-8 text-center text-sm text-muted-foreground" role="status">
+        {loading ? "Memuat data evaluasi jaringan…" : `Data tidak dapat dimuat. ${error ?? ""}`}
+      </div>
+    </div>
+  )
+}
+
+function EvaluasiContent({ db }: { db: EvalDB }) {
   const { region, range } = useFilters()
-  const cs = caseScale(range)
-  const kpi = EVAL_KPIS[region]
-  const byRegion = <T extends { region: string }>(list: T[]) =>
-    region === "nasional" ? list : list.filter((x) => x.region === region)
-  const stations = byRegion(NETWORK_STATIONS)
-  const proposed = byRegion(PROPOSED_STATIONS)
-  const rows = byRegion(EVAL_TABLE)
+
+  // Skor & status dihitung nasional (dinormalkan seluruh stasiun) lalu disaring Wilayah.
+  const all = useMemo(() => computeRows(db, range), [db, range])
+  const rows = useMemo(
+    () => [...stationsInRegion(all, region)].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)),
+    [all, region],
+  )
+  const kpi = useMemo(() => getKpis(rows), [rows])
+  const proposals = useMemo(() => getProposals(db, rows, region), [db, rows, region])
+  const plan = useMemo(() => getActionPlan(db, rows, region, proposals), [db, rows, region, proposals])
+
+  const compTone = kpi.completeness == null ? "default" : kpi.completeness >= COMPLETENESS_GOOD ? "success" : kpi.completeness >= COMPLETENESS_MIN ? "warning" : "danger"
+  const ratioTone = !kpi.ratio ? "default" : kpi.ratio.value > RATIO_CRITICAL ? "danger" : kpi.ratio.value > RATIO_WATCH ? "warning" : "success"
+  const b = kpi.blind
+  const pct = kpi.ratio ? Math.round((kpi.ratio.value - 1) * 100) : 0
+
+  const recs = [
+    { horizon: "Jangka Pendek", span: "0–6 bulan", title: "Respons cepat & operasional", tone: "success" as const, items: plan.short },
+    { horizon: "Jangka Menengah", span: "6–18 bulan", title: "Pengendalian sumber & faskes", tone: "primary" as const, items: plan.mid },
+    { horizon: "Jangka Panjang", span: ">18 bulan", title: "Ekspansi infrastruktur jaringan", tone: "warning" as const, items: plan.long },
+  ]
 
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:p-8">
-      <PageHeader
-        eyebrow="04 · Evaluasi & Rekomendasi"
-        title="Evaluasi Jaringan & Rekomendasi Kebijakan"
-        description="Menilai keandalan jaringan AQMS, celah cakupan pemantauan terhadap beban kesehatan, dan langkah kebijakan yang diusulkan."
-      />
+      <Header />
       <FilterBar show={["region", "period"]} note="Tanpa filter polutan: evaluasi risiko menyeluruh" />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Baris 1: KPI */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard
           label="Kelengkapan data jaringan"
-          value={`${formatId(kpi.completeness)}% jam valid`}
+          value={kpi.completeness == null ? "–" : `${formatId(kpi.completeness, 1)}% jam valid`}
           valueClassName="text-2xl"
-          caption={`Keandalan rekaman dari ${kpi.stations} stasiun AQMS aktif`}
-          tone="success"
+          caption={
+            kpi.operational
+              ? `Jam valid ÷ total jam observasi, dari ${kpi.operational} stasiun AQMS beroperasi${kpi.intermittent ? ` (${kpi.intermittent} intermiten)` : ""}`
+              : "Tidak ada stasiun beroperasi pada wilayah ini"
+          }
+          tone={compTone}
           icon={<CheckCircle2 className="size-4" aria-hidden />}
         />
         <KpiCard
           label="Wilayah paling blind spot"
-          value={kpi.blindSpot}
+          value={b ? b.name : "–"}
           valueClassName="text-lg leading-snug"
-          caption={kpi.blindNote}
+          caption={
+            b
+              ? `${b.cases.toLocaleString("id-ID")} kasus RS · PM2.5 ${formatId(b.ratio ?? 0, 2)}× baseline · kelengkapan data ${formatId(b.completeness, 1)}%`
+              : "Belum ada stasiun berdata pada rentang tanggal ini"
+          }
           tone="danger"
           icon={<EyeOff className="size-4" aria-hidden />}
         />
         <KpiCard
-          label="Rata-rata jarak RS ke stasiun"
-          value={`${formatId(kpi.distance)} km`}
-          valueClassName="text-2xl"
-          caption="Jarak RS rujukan ke sensor pemantau terdekat"
-          tone="warning"
-          icon={<Hospital className="size-4" aria-hidden />}
-        />
-        <KpiCard
           label="Rasio polusi vs baseline"
-          value={`${formatId(kpi.ratio, 2)}× baseline`}
+          value={kpi.ratio ? `${formatId(kpi.ratio.value, 2)}× baseline` : "–"}
           valueClassName="text-2xl"
-          caption={`PM2.5 rata-rata ${kpi.ratioPct}% di atas acuan alamiah wilayah`}
-          tone="danger"
+          caption={
+            kpi.ratio
+              ? `PM2.5 rata-rata ${formatId(kpi.ratio.avg, 1)} µg/m³ vs baseline ${formatId(kpi.ratio.baseline, 1)} µg/m³ (${pct >= 0 ? `${pct}% di atas` : `${Math.abs(pct)}% di bawah`} acuan alamiah)`
+              : "Belum ada data PM2.5 pada rentang tanggal ini"
+          }
+          tone={ratioTone}
           icon={<Ratio className="size-4" aria-hidden />}
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-5">
-        <Panel className="lg:col-span-2" title="Peta evaluasi jaringan & usulan stasiun baru" subtitle="Radius cakupan ±40 km per stasiun (ilustrasi)">
-          <div className="h-80">
-            <NetworkMap stations={stations} proposed={proposed} />
+      {/* Baris 2: peta + tabel (50 : 50) */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel
+          title="Peta evaluasi jaringan & usulan stasiun baru"
+          subtitle={`Radius cakupan ${COVERAGE_KM.inner}–${COVERAGE_KM.outer} km per stasiun (ilustrasi)`}
+          footnote="Dataset tidak memuat koordinat RS (1 RS = 1 stasiun di kota yang sama), jadi titik RS tidak digambar. Titik usulan indikatif: daratan di luar radius 50 km, dekat wilayah berisiko tinggi; verifikasi di lapangan."
+        >
+          <div className="h-80 lg:h-[26rem]">
+            <EvaluasiMap stations={rows} proposals={proposals} />
           </div>
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
-            <LegendDot color="var(--chart-1)" label={`Stasiun (${stations.length})`} />
-            <LegendDot color="var(--destructive)" label={`RS rujukan (${stations.length})`} />
-            <LegendDot color="oklch(0.5 0.1 195 / 0.25)" label="Radius 30–50 km" />
-            <LegendDot color="#f2b632" label={`Usulan stasiun baru (${proposed.length})`} shape="square" />
+            <LegendDot color="var(--chart-1)" label={`Stasiun (${rows.filter((r) => r.operational).length})`} />
+            <LegendDot color="var(--destructive)" label="Wilayah kritis" />
+            <LegendDot color="oklch(0.5 0.1 195 / 0.25)" label={`Radius ${COVERAGE_KM.inner}–${COVERAGE_KM.outer} km`} />
+            <LegendDot color="#f2b632" label={`Usulan stasiun baru (${proposals.length})`} shape="square" />
           </div>
         </Panel>
-        <Panel className="lg:col-span-3" title="Evaluasi pemantauan vs risiko kesehatan" subtitle="Prioritas wilayah berdasarkan beban kasus dan rasio polusi">
+
+        <Panel
+          title="Evaluasi pemantauan vs risiko kesehatan"
+          subtitle="Prioritas wilayah berdasarkan beban kasus dan rasio polusi"
+          footnote={`Beban kasus = resp + cvd + death. Kritis: PM2.5 > ${RATIO_CRITICAL}× baseline dan kasus/hari ≥ median seluruh stasiun. Waspada: PM2.5 > ${RATIO_CRITICAL}×, atau > ${RATIO_WATCH}× dengan beban tinggi, atau kelengkapan < ${COMPLETENESS_MIN}%. Kelengkapan = jam valid ÷ (24 × jumlah hari rentang). Hari sensor macet dikecualikan dari PM2.5.`}
+        >
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/60 hover:bg-muted/60">
                   <TableHead>Wilayah (Kota/Kab)</TableHead>
                   <TableHead>Tipe lokasi</TableHead>
-                  <TableHead>Stasiun</TableHead>
+                  <TableHead>Stasiun eksisting</TableHead>
                   <TableHead className="text-right">Beban kasus RS</TableHead>
                   <TableHead>Kapasitas TT</TableHead>
                   <TableHead>PM2.5 vs baseline</TableHead>
-                  <TableHead className="min-w-56">Status & rekomendasi</TableHead>
+                  <TableHead className="min-w-60">Status & rekomendasi aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((r) => (
-                  <TableRow key={r.area}>
-                    <TableCell className="font-medium whitespace-normal">{r.area}</TableCell>
-                    <TableCell className="whitespace-normal">{r.type}</TableCell>
-                    <TableCell>{r.stations}</TableCell>
-                    <TableCell className="text-right tabular-nums">{Math.round(Number(r.cases.replace(/\./g, "")) * cs).toLocaleString("id-ID")} kasus</TableCell>
-                    <TableCell>{r.beds}</TableCell>
-                    <TableCell className="tabular-nums whitespace-normal">{r.pm}</TableCell>
-                    <TableCell className="whitespace-normal">
-                      <span
-                        className={cn(
-                          "mr-1.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase",
-                          r.status === "Kritis" ? "bg-destructive/10 text-destructive" : "bg-warning/15 text-[oklch(0.5_0.13_55)]",
-                        )}
-                      >
-                        {r.status}
-                      </span>
-                      <span className="text-xs">{r.action}</span>
-                    </TableCell>
-                  </TableRow>
+                  <Row key={r.code} r={r} />
                 ))}
               </TableBody>
             </Table>
@@ -123,12 +179,13 @@ export function EvaluasiDashboard() {
         </Panel>
       </div>
 
+      {/* Baris 3: rencana aksi */}
       <section aria-labelledby="rekomendasi" className="flex flex-col gap-3">
         <h2 id="rekomendasi" className="text-sm font-semibold">
           Rekomendasi kebijakan bertahap
         </h2>
         <div className="grid gap-4 lg:grid-cols-3">
-          {RECOMMENDATIONS.map((rec, i) => (
+          {recs.map((rec, i) => (
             <article key={rec.horizon} className="relative overflow-hidden rounded-xl border bg-card p-5 shadow-xs">
               <span className={cn("absolute inset-x-0 top-0 h-1", toneStyles[rec.tone].bar)} aria-hidden />
               <div className="flex items-center justify-between gap-2">
@@ -153,5 +210,43 @@ export function EvaluasiDashboard() {
         </div>
       </section>
     </div>
+  )
+}
+
+function Row({ r }: { r: WilayahRow }) {
+  const dash = <span className="text-muted-foreground">–</span>
+  return (
+    <TableRow className={r.hasData && r.operational ? undefined : "text-muted-foreground"}>
+      <TableCell className="whitespace-normal">
+        <span className="font-medium">{r.name}</span>
+        <span className="block text-[11px] text-muted-foreground">
+          {r.province} · <span className="font-mono">{r.code}</span>
+        </span>
+      </TableCell>
+      <TableCell className="whitespace-normal">{r.type}</TableCell>
+      <TableCell>{r.operational ? `1 stasiun${r.status === "Intermittent" ? " (intermiten)" : ""}` : "0 (rusak)"}</TableCell>
+      <TableCell className="text-right tabular-nums">{r.hasData ? `${r.cases.toLocaleString("id-ID")} kasus` : dash}</TableCell>
+      <TableCell className="whitespace-normal tabular-nums">
+        {r.hospital.beds.toLocaleString("id-ID")} TT ({r.hospital.cls})
+      </TableCell>
+      <TableCell className="whitespace-normal tabular-nums">
+        {r.avgPm != null && r.ratio != null ? (
+          <>
+            {formatId(r.avgPm, 1)} vs {formatId(r.baseline, 1)} µg/m³ ({formatId(r.ratio, 2)}×)
+          </>
+        ) : (
+          dash
+        )}
+      </TableCell>
+      <TableCell className="whitespace-normal">
+        <span className={cn("mr-1.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide uppercase", levelStyle[r.level])}>
+          {r.level}
+        </span>
+        <span className="text-xs">{r.actions.join(" · ")}</span>
+        {r.operational && (
+          <span className="mt-0.5 block text-[11px] text-muted-foreground">Kelengkapan data {formatId(r.completeness, 1)}%</span>
+        )}
+      </TableCell>
+    </TableRow>
   )
 }
