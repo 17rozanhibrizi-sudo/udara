@@ -3,7 +3,7 @@
 import { FlaskConical, MapPin, RotateCcw, Stethoscope } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DISEASES, POLLUTANT_OPTIONS, REGIONS, type PollutantSelection } from "@/lib/data"
+import { DISEASE_OPTIONS, POLLUTANT_OPTIONS, REGIONS, type DiseaseSelection, type PollutantSelection } from "@/lib/data"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { RESET_FILTERS, useFilters } from "./filter-context"
 
@@ -86,12 +86,12 @@ export function FilterBar({
           />
         )}
         {show.includes("disease") && (
-          <FilterSelect
-            label="Penyakit"
+          <FilterSelect<DiseaseSelection>
+            label="Jenis Penyakit"
             icon={<Stethoscope className="size-3" aria-hidden />}
-            value={f.disease}
-            onChange={(v) => f.setFilter("disease", v)}
-            options={DISEASES.map((d) => ({ value: d.value, label: d.value === "ISPA" ? "ISPA / Pernapasan" : d.value }))}
+            value={f.disease as unknown as DiseaseSelection}
+            onChange={(v) => f.setFilter("disease", v as never)}
+            options={DISEASE_OPTIONS}
           />
         )}
         {show.includes("period") && <DateRangePicker value={f.range} onChange={(v) => f.setFilter("range", v)} />}
