@@ -58,8 +58,6 @@ export const DAY_MS = 86400000
 const MIN_DAYS_CORR = 10 // minimal pasangan hari-stasiun agar r dihitung
 const MIN_STATIONS_CORR = 3 // minimal stasiun untuk korelasi faktor statis
 const MAX_SCATTER_POINTS = 1500
-/** |r| di bawah ini dianggap korelasi lemah: tidak diklaim sebagai faktor dominan */
-export const WEAK_R = 0.1
 
 /* ---------- Muat & siapkan ---------- */
 
@@ -395,10 +393,9 @@ export function getCorrelations(db: PolaDB, f: PolaFilters) {
     const pts = factorPoints(db, f, fa.key)
     const fit = pts.length >= minPoints(fa.key) ? linearFit(pts.map((p) => p.x), pts.map((p) => p.y)) : null
     return { factor: fa.label, key: fa.key, unit: fa.unit, level: fa.level, n: pts.length, r: fit ? round2(fit.r) : null }
-  }).sort((a, b) => Math.abs(b.r ?? -1) - Math.abs(a.r ?? -1))
+  }).sort((a, b) => (b.r == null ? -1 : Math.abs(b.r)) - (a.r == null ? -1 : Math.abs(a.r))) // r null (data kurang) selalu di bawah
   const dominant = rows.length && rows[0].r != null ? rows[0].key : null // |r| terbesar
-  const dominantWeak = dominant != null && Math.abs(rows[0].r ?? 0) < WEAK_R
-  return { rows, dominant, dominantWeak }
+  return { rows, dominant }
 }
 
 export function getScatter(db: PolaDB, f: PolaFilters, key: FactorKey) {
@@ -440,7 +437,7 @@ export type PolaRow = {
   peakMonth: string | null
   weekday: WW | null
   episode: { len: number; range: string }
-  factor: { label: string; r: number; r2: number; weak: boolean } | null
+  factor: { label: string; r: number; r2: number } | null
 }
 
 export function getStationTable(db: PolaDB, hourly: HourlyData | null, f: PolaFilters): PolaRow[] {
@@ -503,7 +500,7 @@ export function getStationTable(db: PolaDB, hourly: HourlyData | null, f: PolaFi
       for (const key of WEATHER_KEYS) {
         const fit = linearFit(weatherArr(s, key).slice(a, b), ys)
         if (fit && (!factor || Math.abs(fit.r) > Math.abs(factor.r)))
-          factor = { label: factorMeta(key).label, r: round2(fit.r), r2: round2(fit.r2), weak: Math.abs(fit.r) < WEAK_R }
+          factor = { label: factorMeta(key).label, r: round2(fit.r), r2: round2(fit.r2) }
       }
     }
 
