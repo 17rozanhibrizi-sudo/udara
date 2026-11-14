@@ -643,6 +643,17 @@ export const POLLUTANT_OPTIONS: { value: PollutantSelection; label: string }[] =
   ...POLLUTANTS.map((p) => ({ value: p.value as PollutantSelection, label: p.label })),
 ]
 
+/* ---------- Opsi "Semua penyakit" (dipakai filter-bar halaman Dampak Kesehatan) ---------- */
+
+export type DiseaseSelection = Disease | "ALL"
+
+export const ALL_DISEASES = "ALL" as const
+
+export const DISEASE_OPTIONS: { value: DiseaseSelection; label: string }[] = [
+  { value: "ALL", label: "Semua penyakit" },
+  ...DISEASES.map((d) => ({ value: d.value as DiseaseSelection, label: d.value })),
+]
+
 /** Panel yang hanya cocok untuk satu polutan (korelasi, scatter) memakai fallback ini */
 export function resolvePollutant(sel: PollutantSelection): Pollutant {
   return sel === "ALL" ? "PM2.5" : sel
