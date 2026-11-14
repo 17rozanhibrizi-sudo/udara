@@ -4,12 +4,12 @@ export type Disease = "ISPA" | "Kardiovaskular" | "Asma darurat" | "PPOK" | "Kem
 export type IspuKey = "baik" | "sedang" | "tidakSehat" | "sangat" | "bahaya"
 
 export const REGIONS: { value: Region; label: string; factor: number; yoy: number }[] = [
-  { value: "nasional", label: "Nasional (semua)", factor: 0.84, yoy: 4.2 },
+  { value: "nasional", label: "Semua Wilayah", factor: 0.84, yoy: 4.2 },
   { value: "sumatera", label: "Sumatera", factor: 0.93, yoy: 6.2 },
   { value: "jawa", label: "Jawa", factor: 0.78, yoy: -3.1 },
   { value: "kalimantan", label: "Kalimantan", factor: 1, yoy: 9.6 },
   { value: "sulawesi", label: "Sulawesi", factor: 0.72, yoy: 1.8 },
-  { value: "maluku-papua", label: "Maluku & Papua", factor: 0.55, yoy: -2.4 },
+  { value: "maluku-papua", label: "Papua", factor: 0.55, yoy: -2.4 },
 ]
 
 export const POLLUTANTS: {
