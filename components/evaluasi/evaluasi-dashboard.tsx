@@ -11,6 +11,7 @@ import {
   COMPLETENESS_GOOD,
   COMPLETENESS_MIN,
   COVERAGE_KM,
+  ISOLATION_KM,
   RATIO_CRITICAL,
   RATIO_WATCH,
   computeRows,
@@ -138,7 +139,7 @@ function EvaluasiContent({ db }: { db: EvalDB }) {
         <Panel
           title="Peta evaluasi jaringan & usulan stasiun baru"
           subtitle={`Radius cakupan ${COVERAGE_KM.inner}–${COVERAGE_KM.outer} km per stasiun (ilustrasi)`}
-          footnote="Dataset tidak memuat koordinat RS (1 RS = 1 stasiun di kota yang sama), jadi titik RS tidak digambar. Titik usulan indikatif: daratan di luar radius 50 km, dekat wilayah berisiko tinggi; verifikasi di lapangan."
+          footnote={`Dataset tidak memuat koordinat RS (1 RS = 1 stasiun di kota yang sama), jadi titik RS tidak digambar. Titik usulan indikatif: daratan di luar radius 50 km, dekat wilayah berisiko tinggi atau terisolasi (> ${ISOLATION_KM} km dari stasiun lain); verifikasi di lapangan.`}
         >
           <div className="h-80 lg:h-[26rem]">
             <EvaluasiMap stations={rows} proposals={proposals} />
