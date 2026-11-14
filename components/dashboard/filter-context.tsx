@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react"
-import { DEFAULT_RANGE, type DateRange, type Disease, type Pollutant, type Region } from "@/lib/data"
+import { DATA_MAX, DATA_MIN, DEFAULT_RANGE, type DateRange, type Disease, type Pollutant, type Region } from "@/lib/data"
 
 type FilterState = {
   region: Region
@@ -10,6 +10,7 @@ type FilterState = {
   disease: Disease
 }
 
+/** Kondisi awal saat halaman pertama dibuka: ringan (30 hari terakhir data). */
 export const DEFAULT_FILTERS: FilterState = {
   region: "kalimantan",
   pollutant: "PM2.5",
@@ -17,9 +18,23 @@ export const DEFAULT_FILTERS: FilterState = {
   disease: "ISPA",
 }
 
+/**
+ * Kondisi setelah tombol [Reset filter] sesuai spesifikasi:
+ * Semua Wilayah, Semua Polutan, seluruh periode observasi.
+ * "ALL" sudah didukung di runtime (POLLUTANT_OPTIONS + resolvePollutant); cast dipakai agar tipe Pollutant halaman lain tidak berubah.
+ * Penyakit: belum ada opsi "Semua Penyakit" di DISEASES, jadi tetap ISPA sampai halaman Dampak Kesehatan dikerjakan.
+ */
+export const RESET_FILTERS: FilterState = {
+  region: "nasional",
+  pollutant: "ALL" as unknown as Pollutant,
+  range: { from: DATA_MIN, to: DATA_MAX },
+  disease: "ISPA",
+}
+
 type FilterContextValue = FilterState & {
   setFilter: <K extends keyof FilterState>(key: K, value: FilterState[K]) => void
   reset: () => void
+  /** true bila filter sudah sama dengan kondisi hasil Reset (tombol Reset dinonaktifkan) */
   isDefault: boolean
 }
 
@@ -32,7 +47,7 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => ({ ...prev, [key]: value }))
   }, [])
 
-  const reset = useCallback(() => setState(DEFAULT_FILTERS), [])
+  const reset = useCallback(() => setState(RESET_FILTERS), [])
 
   const value = useMemo(
     () => ({
@@ -40,11 +55,11 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
       setFilter,
       reset,
       isDefault:
-        state.region === DEFAULT_FILTERS.region &&
-        state.pollutant === DEFAULT_FILTERS.pollutant &&
-        state.disease === DEFAULT_FILTERS.disease &&
-        state.range.from === DEFAULT_FILTERS.range.from &&
-        state.range.to === DEFAULT_FILTERS.range.to,
+        state.region === RESET_FILTERS.region &&
+        state.pollutant === RESET_FILTERS.pollutant &&
+        state.disease === RESET_FILTERS.disease &&
+        state.range.from === RESET_FILTERS.range.from &&
+        state.range.to === RESET_FILTERS.range.to,
     }),
     [state, setFilter, reset],
   )
