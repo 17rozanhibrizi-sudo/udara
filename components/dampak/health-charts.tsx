@@ -2,20 +2,32 @@
 
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
-import { DISEASES, VULNERABILITY, type Disease, type Hospital } from "@/lib/data"
+import type { DiseaseSelection } from "@/lib/data"
+import { DISEASE_COLS, type HospitalRow } from "@/lib/health-data"
 
-export function PmVsCasesChart({ data, disease }: { data: { day: string; pm: number; cases: number }[]; disease: string }) {
+const fmt = (v: unknown) => (v == null ? "–" : Number(v).toLocaleString("id-ID"))
+
+/* ---------- Grafik 1: dual-axis ---------- */
+export function PmVsCasesChart({
+  data,
+  pollutantLabel,
+  diseaseLabel,
+}: {
+  data: { day: string; pm: number | null; cases: number | null }[]
+  pollutantLabel: string
+  diseaseLabel: string
+}) {
   const config = {
-    pm: { label: "PM2.5 (µg/m³)", color: "var(--warning)" },
-    cases: { label: `Kasus ${disease}/hari`, color: "var(--chart-1)" },
+    pm: { label: `${pollutantLabel} (µg/m³)`, color: "var(--warning)" },
+    cases: { label: `Kasus ${diseaseLabel}/hari`, color: "var(--chart-1)" },
   } satisfies ChartConfig
   return (
     <ChartContainer config={config} className="aspect-auto h-60 w-full">
       <LineChart data={data} margin={{ left: -12, right: -12, top: 8 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
-        <XAxis dataKey="day" tickLine={false} axisLine={false} interval={5} tickMargin={8} />
+        <XAxis dataKey="day" tickLine={false} axisLine={false} minTickGap={24} tickMargin={8} />
         <YAxis yAxisId="pm" tickLine={false} axisLine={false} width={44} />
-        <YAxis yAxisId="cases" orientation="right" tickLine={false} axisLine={false} width={44} />
+        <YAxis yAxisId="cases" orientation="right" tickLine={false} axisLine={false} width={48} tickFormatter={fmt} />
         <ChartTooltip content={<ChartTooltipContent />} />
         <Line yAxisId="pm" dataKey="pm" type="monotone" stroke="var(--color-pm)" strokeWidth={2.5} dot={false} />
         <Line yAxisId="cases" dataKey="cases" type="monotone" stroke="var(--color-cases)" strokeWidth={2.5} dot={false} />
@@ -24,24 +36,41 @@ export function PmVsCasesChart({ data, disease }: { data: { day: string; pm: num
   )
 }
 
-export function VulnerabilityChart({ active }: { active: string }) {
+/* ---------- Grafik 2: kerentanan (β × 10) ---------- */
+export function VulnerabilityChart({
+  data,
+  active,
+}: {
+  data: { pollutant: string; key: string; balita: number | null; lansia: number | null }[]
+  active: string
+}) {
   const config = {
     balita: { label: "Balita (<5 th)", color: "var(--warning)" },
     lansia: { label: "Lansia (>60 th)", color: "var(--chart-3)" },
   } satisfies ChartConfig
   return (
     <ChartContainer config={config} className="aspect-auto h-60 w-full">
-      <BarChart data={VULNERABILITY} margin={{ left: -16, right: 8, top: 18 }} barGap={2}>
+      <BarChart data={data} margin={{ left: -16, right: 8, top: 18 }} barGap={2}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
-        <XAxis dataKey="pollutant" tickLine={false} axisLine={false} />
+        <XAxis dataKey="pollutant" tickLine={false} axisLine={false} fontSize={11} />
         <YAxis tickLine={false} axisLine={false} width={44} />
         <ChartTooltip content={<ChartTooltipContent />} />
         {(["balita", "lansia"] as const).map((k) => (
-          <Bar key={k} dataKey={k} radius={[4, 4, 0, 0]} barSize={14}>
-            {VULNERABILITY.map((v) => (
-              <Cell key={v.key} fill={`var(--color-${k})`} fillOpacity={v.key === active ? 1 : 0.3} />
+          <Bar key={k} dataKey={k} radius={[4, 4, 0, 0]} barSize={12}>
+            {data.map((v) => (
+              <Cell
+                key={v.key}
+                fill={v.key === active ? `var(--color-${k})` : "var(--subtle)"}
+                fillOpacity={v.key === active ? 1 : 0.7}
+              />
             ))}
-            <LabelList dataKey={k} position="top" fontSize={10} className="fill-foreground" />
+            <LabelList
+              dataKey={k}
+              position="top"
+              fontSize={9}
+              className="fill-foreground"
+              formatter={(v) => (v == null ? "" : Number(v).toLocaleString("id-ID"))}
+            />
           </Bar>
         ))}
       </BarChart>
@@ -49,66 +78,60 @@ export function VulnerabilityChart({ active }: { active: string }) {
   )
 }
 
-export function DiseaseTotalsChart({ data, active }: { data: { disease: Disease; total: number }[]; active: Disease }) {
+/* ---------- Grafik 3: akumulasi per penyakit ---------- */
+export function DiseaseTotalsChart({
+  data,
+  active,
+}: {
+  data: { disease: string; label: string; total: number }[]
+  active: DiseaseSelection
+}) {
   const config = { total: { label: "Total kasus", color: "var(--chart-1)" } } satisfies ChartConfig
   return (
     <ChartContainer config={config} className="aspect-auto h-60 w-full">
-      <BarChart data={data} layout="vertical" margin={{ left: 0, right: 48 }}>
+      <BarChart data={data} layout="vertical" margin={{ left: 0, right: 56 }}>
         <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-        <XAxis type="number" tickLine={false} axisLine={false} />
-        <YAxis dataKey="disease" type="category" width={104} tickLine={false} axisLine={false} fontSize={11} />
+        <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={fmt} />
+        <YAxis dataKey="label" type="category" width={104} tickLine={false} axisLine={false} fontSize={11} />
         <ChartTooltip content={<ChartTooltipContent hideLabel />} />
         <Bar dataKey="total" barSize={16} radius={4}>
           {data.map((d) => (
-            <Cell key={d.disease} fill={d.disease === active ? "var(--chart-1)" : "var(--subtle)"} />
+            <Cell key={d.disease} fill={active === "ALL" || d.disease === active ? "var(--chart-1)" : "var(--subtle)"} />
           ))}
-          <LabelList
-            dataKey="total"
-            position="right"
-            formatter={(v) => Number(v).toLocaleString("id-ID")}
-            className="fill-foreground"
-            fontSize={11}
-          />
+          <LabelList dataKey="total" position="right" formatter={fmt} className="fill-foreground" fontSize={11} />
         </Bar>
       </BarChart>
     </ChartContainer>
   )
 }
 
-const DISEASE_KEYS = ["ispa", "kardio", "asma", "ppok", "kematian"] as const
+/* ---------- Proporsi per RS (100% stacked) ---------- */
+const ALL_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
+const GREYS = ["var(--chart-3)", "oklch(0.62 0.02 230)", "oklch(0.74 0.015 230)", "oklch(0.84 0.01 230)"]
 
-export function HospitalShareChart({ hospitals, active }: { hospitals: Hospital[]; active: Disease }) {
-  const activeIdx = DISEASES.findIndex((d) => d.value === active)
-  const data = hospitals.map((h) => ({
-    code: h.code,
-    ...Object.fromEntries(DISEASE_KEYS.map((k, i) => [k, h.share[i]])),
-  }))
-  const greys = ["var(--chart-3)", "oklch(0.62 0.02 230)", "oklch(0.74 0.015 230)", "oklch(0.84 0.01 230)"]
-  let greyIdx = 0
-  const config = Object.fromEntries(
-    DISEASE_KEYS.map((k, i) => [
-      k,
-      { label: DISEASES[i].value, color: i === activeIdx ? "var(--chart-1)" : greys[greyIdx++ % greys.length] },
-    ]),
-  ) satisfies ChartConfig
+export function diseaseColors(active: DiseaseSelection) {
+  if (active === "ALL") return DISEASE_COLS.map((d, i) => ({ ...d, color: ALL_COLORS[i] }))
+  let g = 0
+  return DISEASE_COLS.map((d) => ({ ...d, color: d.disease === active ? "var(--chart-1)" : GREYS[g++ % GREYS.length] }))
+}
+
+export function HospitalShareChart({ rows, active }: { rows: HospitalRow[]; active: DiseaseSelection }) {
+  const cols = diseaseColors(active)
+  const data = rows
+    .filter((r) => r.hasData)
+    .map((r) => ({ code: r.code, ...Object.fromEntries(cols.map((c, i) => [c.col, r.share[i]])) }))
+  const config = Object.fromEntries(cols.map((c) => [c.col, { label: c.label, color: c.color }])) satisfies ChartConfig
 
   return (
     <ChartContainer config={config} className="aspect-auto w-full" style={{ height: Math.max(200, data.length * 30 + 40) }}>
       <BarChart data={data} layout="vertical" stackOffset="expand" margin={{ left: 0, right: 8 }}>
         <XAxis type="number" tickFormatter={(v) => `${Math.round(v * 100)}%`} tickLine={false} axisLine={false} />
-        <YAxis dataKey="code" type="category" width={76} tickLine={false} axisLine={false} fontSize={11} />
+        <YAxis dataKey="code" type="category" width={80} tickLine={false} axisLine={false} fontSize={11} />
         <ChartTooltip content={<ChartTooltipContent />} />
-        {DISEASE_KEYS.map((k) => (
-          <Bar key={k} dataKey={k} stackId="a" fill={`var(--color-${k})`} barSize={16} />
+        {cols.map((c) => (
+          <Bar key={c.col} dataKey={c.col} stackId="a" fill={`var(--color-${c.col})`} barSize={16} />
         ))}
       </BarChart>
     </ChartContainer>
   )
-}
-
-export function hospitalLegend(active: Disease) {
-  const activeIdx = DISEASES.findIndex((d) => d.value === active)
-  const greys = ["var(--chart-3)", "oklch(0.62 0.02 230)", "oklch(0.74 0.015 230)", "oklch(0.84 0.01 230)"]
-  let g = 0
-  return DISEASES.map((d, i) => ({ label: d.value, color: i === activeIdx ? "var(--chart-1)" : greys[g++ % greys.length] }))
 }
