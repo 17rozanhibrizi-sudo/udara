@@ -13,6 +13,9 @@ export const NAV_ITEMS = [
   { href: "/evaluasi", label: "Evaluasi & Rekomendasi", icon: ShieldCheck },
 ]
 
+/** Halaman yang sudah memakai data nyata. Tambahkan href lain di sini saat halamannya selesai dikerjakan. */
+const LIVE_PAGES = ["/overview"]
+
 function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2.5" aria-label="Gelar Rasa - beranda">
@@ -29,6 +32,7 @@ function Logo() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const isLive = LIVE_PAGES.some((p) => pathname.startsWith(p))
 
   return (
     <div className="flex min-h-dvh">
@@ -69,8 +73,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Status data
           </div>
           <p className="mt-1.5 text-xs leading-relaxed text-sidebar-foreground/70">
-            Seluruh angka pada dasbor ini adalah <span className="font-semibold text-warning">data dummy</span> untuk
-            keperluan prototipe.
+            {isLive ? (
+              <>
+                Halaman ini memakai <span className="font-semibold text-sidebar-primary">data AQMS nyata</span> (1 Jan
+                2024 – 14 Okt 2026).
+              </>
+            ) : (
+              <>
+                Halaman ini masih memakai <span className="font-semibold text-warning">data dummy</span> untuk
+                keperluan prototipe.
+              </>
+            )}
           </p>
         </div>
       </aside>
@@ -81,9 +94,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="[&_a]:gap-2">
               <Logo />
             </div>
-            <span className="rounded-full bg-warning/20 px-2.5 py-1 text-[11px] font-semibold text-warning">
-              Data dummy
-            </span>
+            {!isLive && (
+              <span className="rounded-full bg-warning/20 px-2.5 py-1 text-[11px] font-semibold text-warning">
+                Data dummy
+              </span>
+            )}
           </div>
           <nav aria-label="Navigasi utama" className="flex gap-1 overflow-x-auto px-3 pb-3">
             {NAV_ITEMS.map((item) => {
