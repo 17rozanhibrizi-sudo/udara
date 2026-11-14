@@ -2,19 +2,27 @@ import Image from "next/image"
 import Link from "next/link"
 import { ArrowRight, BarChart3, Database, HeartPulse, LayoutDashboard, Radio, ShieldCheck } from "lucide-react"
 import { ISPU_CATEGORIES } from "@/lib/data"
-import stats from "@/lib/home-stats.json"
 
-/** "last30" = 30 hari terakhir data (sama dengan default dashboard); "all" = seluruh periode data */
-const PERIOD: "last30" | "all" = "last30"
+/** Cakupan data (sumber: master stasiun–RS dan 04_env_health_daily_ready; diperbarui manual bila data berubah) */
+const COVERAGE = {
+  stations: 27, // terdaftar; 26 beroperasi, 1 rusak (AQMS-JMB-02)
+  operating: 26,
+  intermittent: 3,
+  hospitals: 27, // RS rujukan; 26 punya data kunjungan
+  islands: 5, // Sumatera, Jawa, Kalimantan, Sulawesi, Papua
+  from: "2024-01-01",
+  to: "2026-10-14",
+  days: 1018,
+  pollutants: ["PM2.5", "PM10", "SO₂", "CO", "O₃", "NO₂"],
+  diseases: ["ISPA", "asma", "PPOK", "kardiovaskular", "kematian"],
+}
 
-const win = stats[PERIOD]
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
 const fmtDate = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number)
   return `${d} ${MONTHS[m - 1]} ${y}`
 }
-const idn = (n: number, digits = 0) => n.toLocaleString("id-ID", { minimumFractionDigits: digits, maximumFractionDigits: digits })
-const periodLabel = PERIOD === "last30" ? "30 hari terakhir" : "seluruh periode"
+const idn = (n: number) => n.toLocaleString("id-ID")
 
 const SECTIONS = [
   {
@@ -48,10 +56,10 @@ const SECTIONS = [
 ]
 
 const HEADLINES = [
-  { value: idn(stats.stations.operating), label: `Stasiun AQMS beroperasi (dari ${stats.stations.total} terdaftar)` },
-  { value: win.pm25Kalimantan == null ? "–" : idn(win.pm25Kalimantan, 1), label: `µg/m³ rata-rata PM2.5 Kalimantan · ${periodLabel}` },
-  { value: idn(win.ispaNasional), label: `Kasus ISPA di RS rujukan · ${periodLabel}` },
-  { value: win.completeness == null ? "–" : `${idn(win.completeness, 1)}%`, label: `Kelengkapan data jaringan · ${periodLabel}` },
+  { value: `${COVERAGE.stations} / ${COVERAGE.hospitals}`, label: `Stasiun AQMS / RS rujukan · tersebar di ${COVERAGE.islands} pulau besar` },
+  { value: `${COVERAGE.from.slice(0, 4)}–${COVERAGE.to.slice(0, 4)}`, label: `Periode observasi · ${idn(COVERAGE.days)} hari` },
+  { value: String(COVERAGE.pollutants.length), label: `Parameter polutan · ${COVERAGE.pollutants.join(", ")}` },
+  { value: String(COVERAGE.diseases.length), label: `Kategori dampak medis · ${COVERAGE.diseases.join(", ")}` },
 ]
 
 export function HomePage() {
@@ -73,7 +81,7 @@ export function HomePage() {
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-sidebar-primary opacity-60" />
               <span className="relative inline-flex size-2 rounded-full bg-sidebar-primary" />
             </span>
-            Pemantauan periode {fmtDate(win.from)} – {fmtDate(win.to)}
+            Periode observasi {fmtDate(COVERAGE.from)} – {fmtDate(COVERAGE.to)}
           </span>
           <div className="max-w-2xl">
             <h1 className="text-3xl font-bold tracking-tight text-balance md:text-5xl">
@@ -169,8 +177,7 @@ export function HomePage() {
               <span>
                 <span className="font-medium">AQMS per jam</span>
                 <span className="block text-xs text-muted-foreground">
-                  {stats.stations.operating} stasiun beroperasi dari {stats.stations.total} terdaftar
-                  {stats.stations.intermittent ? ` (${stats.stations.intermittent} intermiten)` : ""} · PM2.5, PM10, CO, SO₂, NO₂, O₃
+                  {COVERAGE.operating} stasiun beroperasi dari {COVERAGE.stations} terdaftar ({COVERAGE.intermittent} intermiten) · PM2.5, PM10, CO, SO₂, NO₂, O₃
                 </span>
               </span>
             </li>
