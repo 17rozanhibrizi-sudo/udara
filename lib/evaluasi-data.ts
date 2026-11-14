@@ -72,6 +72,10 @@ export type WilayahRow = {
   score: number // skor blind spot gabungan 0..1
   level: Level
   actions: string[]
+  /** jarak (km) ke stasiun beroperasi lain terdekat; null bila stasiun nonaktif */
+  nearestKm: number | null
+  /** true bila nearestKm > ISOLATION_KM: cakupan jaringan di sekitarnya praktis hanya stasiun ini */
+  isolated: boolean
 }
 
 export type Proposal = { lat: number; lng: number; label: string; near: string }
@@ -88,6 +92,10 @@ export const COMPLETENESS_MIN = 80
 export const COMPLETENESS_GOOD = 95
 const PROPOSAL_REACH_KM = 150
 const PROPOSAL_SPACING_KM = 100
+/** Wilayah "terisolasi" = tidak ada stasiun beroperasi lain dalam radius ini (km). Wilayah terisolasi selalu jadi calon usulan stasiun baru. */
+export const ISOLATION_KM = 500
+/** Bobot minimum wilayah terisolasi pada perhitungan manfaat usulan (skala skor 0..1) */
+const ISOLATED_WEIGHT = 0.3
 
 /* ---------- Muat & siapkan ---------- */
 
@@ -150,7 +158,7 @@ const isClassBC = (cls: string) => /^Tipe [BC]\b/.test(cls)
 
 /* ---------- 1. Hitung semua wilayah (nasional) pada rentang tanggal ---------- */
 
-type Base = Omit<WilayahRow, "highLoad" | "score" | "level" | "actions">
+type Base = Omit<WilayahRow, "highLoad" | "score" | "level" | "actions" | "nearestKm" | "isolated">
 
 function baseRow(db: EvalDB, s: EvalStation, range: DateRange): Base {
   const i0 = dayIdx(db, range.from)
@@ -204,9 +212,10 @@ function minMax(vals: number[]) {
   return (x: number) => (hi > lo ? (x - lo) / (hi - lo) : 0)
 }
 
-function actionsFor(r: Base, level: Level): string[] {
+function actionsFor(r: Base, level: Level, isolated = false): string[] {
   if (level === "Nonaktif") return ["Perbaiki atau ganti sensor (stasiun rusak)"]
-  if (level === "Tanpa data") return ["Pastikan pengiriman data pada rentang ini"]
+  if (level === "Tanpa data")
+    return ["Pastikan pengiriman data pada rentang ini", ...(isolated ? ["Pertimbangkan stasiun tambahan (cakupan terbatas)"] : [])]
   const out: string[] = []
   if (level === "Kritis" || level === "Waspada") {
     if (isPeat(r.type)) out.push("Protokol kabut asap & siaga ruang rawat pernapasan")
@@ -215,6 +224,7 @@ function actionsFor(r: Base, level: Level): string[] {
     else if (isUrban(r.type)) out.push("Peringatan dini & pantau jam puncak")
     else out.push("Tingkatkan pemantauan & kesiapsiagaan RS")
   }
+  if (isolated) out.push("Pertimbangkan stasiun tambahan (cakupan terbatas)")
   if (r.completeness < COMPLETENESS_GOOD || r.status === "Intermittent") out.push("Kalibrasi/perbaiki sensor")
   if (!out.length) out.push("Pertahankan pemantauan rutin")
   return out
@@ -229,7 +239,15 @@ export function computeRows(db: EvalDB, range: DateRange): WilayahRow[] {
   const nRatio = minMax(scored.map((r) => r.ratio ?? 0))
   const nGap = minMax(scored.map((r) => 100 - r.completeness))
 
+  // Jarak ke stasiun beroperasi lain terdekat (seluruh nasional, tidak bergantung filter Wilayah)
+  const live = base.filter((r) => r.operational)
+
   return base.map((r): WilayahRow => {
+    const nearestKm = r.operational
+      ? live.reduce((m, o) => (o === r ? m : Math.min(m, haversineKm(r, o))), Infinity)
+      : null
+    const nearest = nearestKm != null && Number.isFinite(nearestKm) ? nearestKm : null
+    const isolated = nearest != null && nearest > ISOLATION_KM
     const inScore = r.operational && r.hasData && r.ratio != null
     const highLoad = inScore && (r.casesPerDay ?? 0) >= med
     const score = inScore
@@ -247,7 +265,7 @@ export function computeRows(db: EvalDB, range: DateRange): WilayahRow[] {
     )
       level = "Waspada"
     else level = "Terpantau"
-    return { ...r, highLoad, score, level, actions: actionsFor(r, level) }
+    return { ...r, highLoad, score, level, nearestKm: nearest, isolated, actions: actionsFor(r, level, isolated) }
   })
 }
 
@@ -283,13 +301,15 @@ export function getKpis(rows: WilayahRow[]) {
 
 /**
  * Kandidat = titik daratan >= 50 km dari semua stasiun beroperasi (dihitung di script build).
- * Manfaat kandidat = jumlah skor wilayah berisiko (Kritis / Waspada akibat polusi) yang berada <= 150 km,
- * dibobot makin dekat makin besar. Dipilih greedy, antar-usulan minimal 100 km. Hasil INDIKATIF.
+ * Wilayah yang dilayani = (a) Kritis / Waspada akibat polusi, atau (b) terisolasi (> ISOLATION_KM dari stasiun lain).
+ * Manfaat kandidat = jumlah bobot wilayah tsb yang berada <= 150 km, dibobot makin dekat makin besar;
+ * wilayah terisolasi punya bobot minimum ISOLATED_WEIGHT. Dipilih greedy, antar-usulan minimal 100 km. Hasil INDIKATIF.
  */
 export function getProposals(db: EvalDB, rows: WilayahRow[], region: Region): Proposal[] {
+  const weight = (r: WilayahRow) => (r.isolated ? Math.max(r.score, ISOLATED_WEIGHT) : r.score)
   const needs = rows
-    .filter((r) => r.level === "Kritis" || (r.level === "Waspada" && (r.ratio ?? 0) > RATIO_WATCH))
-    .sort((a, b) => b.score - a.score)
+    .filter((r) => r.level === "Kritis" || (r.level === "Waspada" && (r.ratio ?? 0) > RATIO_WATCH) || r.isolated)
+    .sort((a, b) => weight(b) - weight(a))
     .slice(0, 6)
   if (!needs.length || !db.cand.length) return []
   const max = region === "nasional" ? 4 : 2
@@ -303,7 +323,7 @@ export function getProposals(db: EvalDB, rows: WilayahRow[], region: Region): Pr
       let nearD = Infinity
       for (const r of needs) {
         const dkm = haversineKm({ lat, lng }, r)
-        if (dkm <= PROPOSAL_REACH_KM) benefit += r.score * (1 - dkm / PROPOSAL_REACH_KM)
+        if (dkm <= PROPOSAL_REACH_KM) benefit += weight(r) * (1 - dkm / PROPOSAL_REACH_KM)
         if (dkm < nearD) {
           nearD = dkm
           near = r
@@ -387,8 +407,8 @@ export function getActionPlan(db: EvalDB, rows: WilayahRow[], region: Region, pr
 
   const long: string[] = [
     proposals.length
-      ? `Bangun stasiun AQMS baru di ${proposals.length} titik usulan pada peta (${list(proposals.map((p) => p.near), 4)}): wilayah berbeban kasus tinggi di luar radius ${COVERAGE_KM.outer} km stasiun eksisting.`
-      : `Belum ada celah di luar radius ${COVERAGE_KM.outer} km pada wilayah berisiko; pertahankan kerapatan jaringan yang ada.`,
+      ? `Bangun stasiun AQMS baru di ${proposals.length} titik usulan pada peta (${list(proposals.map((p) => p.near), 4)}): wilayah berisiko atau terisolasi (> ${ISOLATION_KM} km dari stasiun lain), di luar radius ${COVERAGE_KM.outer} km stasiun eksisting.`
+      : `Belum ada celah di luar radius ${COVERAGE_KM.outer} km pada wilayah berisiko atau terisolasi; pertahankan kerapatan jaringan yang ada.`,
     "Integrasikan telemetri kualitas udara langsung dengan rekam medis harian RS rujukan untuk pemantauan berkelanjutan.",
   ]
   return { short, mid, long }
