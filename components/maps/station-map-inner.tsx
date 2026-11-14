@@ -43,7 +43,10 @@ export default function StationMapInner({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <FitBounds points={points} />
-      {stations.map((s) => {
+      {/* stasiun tanpa data digambar lebih dulu agar stasiun berdata selalu di atasnya */}
+      {[...stations]
+        .sort((x, y) => Number(y.hasData === false) - Number(x.hasData === false))
+        .map((s) => {
         const noData = s.hasData === false
         const cat = ispuCategory(s.ispuNow)
         const isSel = selected === s.code
@@ -60,7 +63,7 @@ export default function StationMapInner({
                 : cat.color.startsWith("var")
                   ? getComputedColor(cat.color)
                   : cat.color,
-              fillOpacity: noData ? 0.6 : selected && !isSel ? 0.45 : 0.95,
+              fillOpacity: selected && !isSel ? 0.45 : 0.95,
             }}
             eventHandlers={{ click: () => onSelect(isSel ? null : s.code) }}
           >
