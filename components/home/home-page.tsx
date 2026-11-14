@@ -2,6 +2,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { ArrowRight, BarChart3, Database, EyeOff, HeartPulse, LayoutDashboard, Radio, ShieldCheck, Users } from "lucide-react"
 import { ISPU_CATEGORIES } from "@/lib/data"
+import { BrandLogo } from "@/components/dashboard/brand-logo"
 
 /** Cakupan data (sumber: master stasiun–RS dan 04_env_health_daily_ready; diperbarui manual bila data berubah) */
 const COVERAGE = {
@@ -19,7 +20,7 @@ const COVERAGE = {
   /** stasiun beroperasi yang jaraknya > 1.200 km dari stasiun beroperasi lain terdekat (Sorong, Merauke) */
   isolatedStations: 2,
   isolatedKm: 1200,
-  completeness: 93.0, // % jam valid stasiun beroperasi, seluruh periode
+  completeness: 93.1, // % jam valid (baris valid / baris mentah) 26 stasiun beroperasi, seluruh periode
   ispaCases: 688345, // kasus ISPA/pernapasan seluruh periode, seluruh RS
   lansiaPct: 54.8, // porsi rawat inap pernapasan: lansia >60 th vs balita <5 th
   balitaPct: 45.2,
@@ -74,6 +75,8 @@ const HEADLINES = [
 export function HomePage() {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-4 p-4 md:p-6 lg:p-8">
+      <BrandLogo className="self-start" />
+
       {/* Baris 1: hero (kiri) + dua masalah (kanan) */}
       <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
         <section className="relative overflow-hidden rounded-2xl bg-sidebar text-sidebar-accent-foreground">
@@ -237,7 +240,7 @@ export function HomePage() {
               <span>
                 <span className="font-medium">Catatan kualitas data</span>
                 <span className="block text-xs text-muted-foreground">
-                  Lolos QC (valid); hari sensor macet dikecualikan dari rata-rata konsentrasi.
+                  Hanya data valid; hari dengan kurang dari 18 jam data valid dikecualikan dari rata-rata konsentrasi.
                 </span>
               </span>
             </li>
