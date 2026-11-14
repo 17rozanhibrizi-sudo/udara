@@ -65,6 +65,12 @@ const DAY_MS = 86400000
 export const MAX_LAG = 7
 /** Minimal pasangan data agar r / β dihitung */
 const MIN_PAIRS = 30
+/** r lag tertinggi di bawah ini dianggap tidak ada jeda yang jelas */
+export const WEAK_LAG_R = 0.1
+/** porsi penyakit RS dianggap menonjol bila ≥ nilai ini × porsi rata-rata wilayah */
+const STANDOUT_MIN = 1.1
+/** RS dengan total kasus kurang dari ini tidak diberi label "menonjol" (sampel terlalu kecil) */
+const STANDOUT_MIN_CASES = 30
 
 /* ---------- Muat & siapkan ---------- */
 
@@ -295,6 +301,8 @@ export type HospitalRow = {
   dominantPollutant: { label: string; ratio: number } | null
   total: number
   dominantDisease: Disease | null
+  /** kategori yang porsinya paling melebihi rata-rata RS lain di wilayah & periode yang sama (null bila tidak ada ≥ 1,1×) */
+  standout: { disease: Disease; ratio: number } | null
   /** persen 5 kategori, urutan DISEASE_COLS */
   share: [number, number, number, number, number]
 }
@@ -302,6 +310,7 @@ export type HospitalRow = {
 export function getHospitalRows(db: HealthDB, { region, range, disease }: Pick<HealthFilters, "region" | "range" | "disease">): HospitalRow[] {
   const i0 = dayIdx(db, range.from)
   const i1 = dayIdx(db, range.to)
+  const catByCode = new Map<string, Record<DiseaseCol, number>>()
   const rows = hospitalsIn(db, region).map((h): HospitalRow => {
     const [a, b] = bounds(h.idx, i0, i1)
     const base = {
@@ -309,7 +318,7 @@ export function getHospitalRows(db: HealthDB, { region, range, disease }: Pick<H
       classLabel: `${h.class} · ${h.beds} TT`, status: h.status,
     }
     if (b <= a)
-      return { ...base, hasData: false, days: 0, dominantPollutant: null, total: 0, dominantDisease: null, share: [0, 0, 0, 0, 0] }
+      return { ...base, hasData: false, days: 0, dominantPollutant: null, total: 0, dominantDisease: null, standout: null, share: [0, 0, 0, 0, 0] }
 
     let total = 0
     const cat: Record<DiseaseCol, number> = { resp: 0, cvd: 0, asthma: 0, copd: 0, death: 0 }
@@ -317,6 +326,7 @@ export function getHospitalRows(db: HealthDB, { region, range, disease }: Pick<H
       total += casesAt(h, k, disease)
       for (const d of DISEASE_COLS) cat[d.col] += h.h[d.col][k]
     }
+    catByCode.set(h.code, cat)
     const catSum = DISEASE_COLS.reduce((s, d) => s + cat[d.col], 0)
     const share = DISEASE_COLS.map((d) => (catSum ? round1((cat[d.col] / catSum) * 100) : 0)) as HospitalRow["share"]
     const dom = DISEASE_COLS.reduce((x, y) => (cat[y.col] > cat[x.col] ? y : x))
@@ -336,7 +346,27 @@ export function getHospitalRows(db: HealthDB, { region, range, disease }: Pick<H
       const ratio = s / c / standardOf(p.value)
       if (!dp || ratio > dp.ratio) dp = { label: p.label, ratio: round1(ratio) }
     }
-    return { ...base, hasData: true, days: b - a, dominantPollutant: dp, total, dominantDisease: dom.disease, share }
+    return { ...base, hasData: true, days: b - a, dominantPollutant: dp, total, dominantDisease: dom.disease, standout: null, share }
   })
+
+  // "Paling menonjol": porsi kategori di RS ÷ porsi kategori gabungan semua RS berdata pada filter yang sama
+  const pooled: Record<DiseaseCol, number> = { resp: 0, cvd: 0, asthma: 0, copd: 0, death: 0 }
+  for (const c of catByCode.values()) for (const d of DISEASE_COLS) pooled[d.col] += c[d.col]
+  const pooledSum = DISEASE_COLS.reduce((t, d) => t + pooled[d.col], 0)
+  if (catByCode.size >= 2 && pooledSum > 0) {
+    for (const r of rows) {
+      const c = catByCode.get(r.code)
+      if (!c) continue
+      const sum = DISEASE_COLS.reduce((t, d) => t + c[d.col], 0)
+      if (sum < STANDOUT_MIN_CASES) continue
+      let best: { disease: Disease; ratio: number } | null = null
+      for (const d of DISEASE_COLS) {
+        if (!pooled[d.col]) continue
+        const ratio = c[d.col] / sum / (pooled[d.col] / pooledSum)
+        if (!best || ratio > best.ratio) best = { disease: d.disease, ratio }
+      }
+      r.standout = best && best.ratio >= STANDOUT_MIN ? { disease: best.disease, ratio: round1(best.ratio) } : null
+    }
+  }
   return rows.sort((x, y) => (x.hasData !== y.hasData ? (x.hasData ? -1 : 1) : y.total - x.total))
 }
