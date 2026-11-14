@@ -1,3 +1,5 @@
+import Image from "next/image"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 export function PageHeader({
@@ -15,6 +17,9 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
       <div className="max-w-2xl">
+        <Link href="/" className="mb-3 inline-block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/50" aria-label="Gelar Rasa — beranda">
+          <Image src="/logo-gelar-rasa.png" alt="Gelar Rasa" width={1000} height={385} priority className="h-9 w-auto md:h-11" />
+        </Link>
         <p className="text-xs font-semibold tracking-wider text-primary uppercase">{eyebrow}</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-balance md:text-3xl">{title}</h1>
         <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground text-pretty">{description}</p>
