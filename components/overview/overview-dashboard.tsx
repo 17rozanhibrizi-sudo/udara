@@ -178,6 +178,7 @@ export function OverviewDashboard() {
             {ISPU_CATEGORIES.map((c) => (
               <LegendDot key={c.key} color={c.color} label={c.label} />
             ))}
+            {stations.some((s) => !s.hasData) && <LegendDot color="#9ca3af" label="Tanpa data / nonaktif" />}
           </div>
         </Panel>
         <Panel
