@@ -1,6 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
-import { ArrowRight, BarChart3, Database, HeartPulse, LayoutDashboard, Radio, ShieldCheck } from "lucide-react"
+import { ArrowRight, BarChart3, Database, EyeOff, HeartPulse, LayoutDashboard, Radio, ShieldCheck, Users } from "lucide-react"
 import { ISPU_CATEGORIES } from "@/lib/data"
 
 /** Cakupan data (sumber: master stasiun–RS dan 04_env_health_daily_ready; diperbarui manual bila data berubah) */
@@ -15,6 +15,14 @@ const COVERAGE = {
   days: 1018,
   pollutants: ["PM2.5", "PM10", "SO₂", "CO", "O₃", "NO₂"],
   diseases: ["ISPA", "asma", "PPOK", "kardiovaskular", "kematian"],
+  defective: 1,
+  /** stasiun beroperasi yang jaraknya > 1.200 km dari stasiun beroperasi lain terdekat (Sorong, Merauke) */
+  isolatedStations: 2,
+  isolatedKm: 1200,
+  completeness: 93.0, // % jam valid stasiun beroperasi, seluruh periode
+  ispaCases: 688345, // kasus ISPA/pernapasan seluruh periode, seluruh RS
+  lansiaPct: 54.8, // porsi rawat inap pernapasan: lansia >60 th vs balita <5 th
+  balitaPct: 45.2,
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
@@ -84,9 +92,10 @@ export function HomePage() {
             Periode observasi {fmtDate(COVERAGE.from)} – {fmtDate(COVERAGE.to)}
           </span>
           <div className="max-w-2xl">
-            <h1 className="text-3xl font-bold tracking-tight text-balance md:text-5xl">
-              Dasbor Kualitas Udara & Dampak Kesehatan
-            </h1>
+            <h1 className="text-4xl font-bold tracking-tight md:text-6xl">SI-NAPAS</h1>
+            <p className="mt-3 text-xl font-semibold tracking-tight text-balance text-sidebar-primary md:text-2xl">
+              Menutup Titik Buta Pemantauan Udara & Melindungi Kelompok Rentan
+            </p>
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-sidebar-foreground/85 md:text-base text-pretty">
               Satu tempat untuk membaca kondisi udara dari jaringan stasiun AQMS, memahami pola dan pemicunya,
               mengukur dampaknya pada pasien rumah sakit, hingga menyusun rekomendasi kebijakan.
@@ -115,6 +124,47 @@ export function HomePage() {
               </div>
             ))}
           </dl>
+        </div>
+      </section>
+
+      <section aria-labelledby="mengapa" className="flex flex-col gap-4">
+        <div>
+          <p className="text-xs font-semibold tracking-wider text-primary uppercase">Mengapa SI-NAPAS</p>
+          <h2 id="mengapa" className="mt-1 text-xl font-bold tracking-tight">
+            Dua masalah yang dijawab dasbor ini
+          </h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <article className="flex flex-col rounded-xl border bg-card p-5 shadow-xs">
+            <span className="flex size-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+              <EyeOff className="size-5" aria-hidden />
+            </span>
+            <h3 className="mt-4 font-semibold">Titik buta pemantauan</h3>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              {COVERAGE.isolatedStations} stasiun (Sorong dan Merauke) berjarak lebih dari {idn(COVERAGE.isolatedKm)} km dari stasiun lain,
+              sehingga wilayah sekitarnya praktis hanya dipantau satu titik. {COVERAGE.defective} stasiun rusak dan{" "}
+              {COVERAGE.intermittent} intermiten; kelengkapan jam valid jaringan {COVERAGE.completeness.toLocaleString("id-ID", { minimumFractionDigits: 1 })}%.
+            </p>
+            <Link href="/evaluasi" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold">
+              Lihat peta evaluasi & usulan stasiun
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </article>
+          <article className="flex flex-col rounded-xl border bg-card p-5 shadow-xs">
+            <span className="flex size-10 items-center justify-center rounded-lg bg-warning/15 text-[oklch(0.5_0.13_55)]">
+              <Users className="size-5" aria-hidden />
+            </span>
+            <h3 className="mt-4 font-semibold">Kelompok rentan</h3>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Dari {idn(COVERAGE.ispaCases)} kasus ISPA di RS rujukan selama periode observasi, rawat inap pernapasan lebih banyak
+              berasal dari lansia (&gt;60 th, {COVERAGE.lansiaPct.toLocaleString("id-ID", { minimumFractionDigits: 1 })}%) dibanding balita
+              (&lt;5 th, {COVERAGE.balitaPct.toLocaleString("id-ID", { minimumFractionDigits: 1 })}%).
+            </p>
+            <Link href="/dampak-kesehatan" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold">
+              Lihat dampak kesehatan per kelompok usia
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </article>
         </div>
       </section>
 
@@ -191,7 +241,7 @@ export function HomePage() {
             <li className="flex gap-3">
               <Database className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
               <span>
-                <span className="font-medium">Status data</span>
+                <span className="font-medium">Catatan kualitas data</span>
                 <span className="block text-xs text-muted-foreground">
                   Data nyata AQMS dan RS rujukan yang sudah lolos QC (valid). Hari ketika sensor macet dikecualikan dari rata-rata konsentrasi.
                 </span>
