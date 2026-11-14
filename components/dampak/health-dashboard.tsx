@@ -15,6 +15,7 @@ import {
   getTotals,
   getTrend,
   getVulnerability,
+  WEAK_LAG_R,
   type HealthDB,
 } from "@/lib/health-data"
 import { useHealthData } from "@/lib/use-health-data"
@@ -92,14 +93,24 @@ function HealthContent({ db }: { db: HealthDB }) {
         />
         <KpiCard
           label="Waktu reaksi pasien"
-          value={lag.best ? (lag.best.lag === 0 ? "Hari yang sama" : `${lag.best.lag} hari setelah paparan`) : "–"}
+          value={
+            lag.best
+              ? lag.best.r < WEAK_LAG_R
+                ? "Tidak ada jeda yang jelas"
+                : lag.best.lag === 0
+                  ? "Hari yang sama"
+                  : `${lag.best.lag} hari setelah paparan`
+              : "–"
+          }
           valueClassName="text-2xl md:text-3xl"
           caption={
             lag.best
-              ? `Korelasi tertinggi r = ${dec(lag.best.r)} · ${pol.label} → ${dLabel} · lag 0–7 hari`
+              ? lag.best.r < WEAK_LAG_R
+                ? `Korelasi tertinggi hanya r = ${dec(lag.best.r)} (lag ${lag.best.lag} hari), di bawah ${dec(WEAK_LAG_R, 1)} · ${pol.label} → ${dLabel}`
+                : `Korelasi tertinggi r = ${dec(lag.best.r)} · ${pol.label} → ${dLabel} · lag 0–7 hari`
               : "Data terlalu sedikit untuk korelasi (min. 30 pasangan hari)"
           }
-          tone="danger"
+          tone={lag.best && lag.best.r < WEAK_LAG_R ? "default" : "danger"}
           icon={<Clock className="size-4" aria-hidden />}
         />
       </div>
@@ -136,7 +147,7 @@ function HealthContent({ db }: { db: HealthDB }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Rincian rumah sakit" subtitle="RS rujukan & stasiun AQMS pasangan" footnote="Polutan dominan = rata-rata periode ÷ baku mutu PP 22/2021 tertinggi di stasiun pasangan">
+        <Panel title="Rincian rumah sakit" subtitle="RS rujukan & stasiun AQMS pasangan" footnote="Polutan dominan = rata-rata periode ÷ baku mutu PP 22/2021 tertinggi di stasiun pasangan · Menonjol = porsi kategori RS ÷ porsi rata-rata RS lain di wilayah & periode ini (≥ 1,1×)">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -168,6 +179,7 @@ function HealthContent({ db }: { db: HealthDB }) {
                     <TableCell className="text-right font-semibold tabular-nums">{h.hasData ? idn(h.total) : "–"}</TableCell>
                     <TableCell>
                       {h.dominantDisease ? (
+                        <>
                         <span
                           className={
                             h.dominantDisease === disease
@@ -177,6 +189,12 @@ function HealthContent({ db }: { db: HealthDB }) {
                         >
                           {h.dominantDisease}
                         </span>
+                        {h.standout && h.standout.disease !== h.dominantDisease && (
+                          <span className="block text-[11px] text-muted-foreground">
+                            Menonjol: {h.standout.disease} ({dec(h.standout.ratio, 1)}× rata-rata)
+                          </span>
+                        )}
+                        </>
                       ) : (
                         <span className="text-xs">{h.status === "Defective" ? "Sensor rusak" : "Tanpa data"}</span>
                       )}
