@@ -8,6 +8,7 @@ const COVERAGE = {
   stations: 27, // terdaftar; 26 beroperasi, 1 rusak (AQMS-JMB-02)
   operating: 26,
   intermittent: 3,
+  defective: 1,
   hospitals: 27, // RS rujukan; 26 punya data kunjungan
   islands: 5, // Sumatera, Jawa, Kalimantan, Sulawesi, Papua
   from: "2024-01-01",
@@ -15,7 +16,6 @@ const COVERAGE = {
   days: 1018,
   pollutants: ["PM2.5", "PM10", "SO₂", "CO", "O₃", "NO₂"],
   diseases: ["ISPA", "asma", "PPOK", "kardiovaskular", "kematian"],
-  defective: 1,
   /** stasiun beroperasi yang jaraknya > 1.200 km dari stasiun beroperasi lain terdekat (Sorong, Merauke) */
   isolatedStations: 2,
   isolatedKm: 1200,
@@ -31,6 +31,7 @@ const fmtDate = (iso: string) => {
   return `${d} ${MONTHS[m - 1]} ${y}`
 }
 const idn = (n: number) => n.toLocaleString("id-ID")
+const pct = (n: number) => n.toLocaleString("id-ID", { minimumFractionDigits: 1 })
 
 const SECTIONS = [
   {
@@ -38,33 +39,33 @@ const SECTIONS = [
     icon: LayoutDashboard,
     title: "Overview",
     question: "Seberapa buruk kualitas udara saat ini?",
-    desc: "Rata-rata konsentrasi, hari melampaui baku mutu, peta stasiun, dan tren harian.",
+    desc: "Konsentrasi, hari melampaui baku mutu, peta stasiun, tren harian.",
   },
   {
     href: "/pola-faktor",
     icon: BarChart3,
     title: "Pola & Faktor",
     question: "Kapan, di mana, dan mengapa polusi memuncak?",
-    desc: "Pola per jam & mingguan, korelasi faktor cuaca/lalu lintas, dan rincian per stasiun.",
+    desc: "Pola per jam & mingguan, korelasi faktor, rincian per stasiun.",
   },
   {
     href: "/dampak-kesehatan",
     icon: HeartPulse,
     title: "Dampak Kesehatan",
     question: "Siapa yang paling terdampak?",
-    desc: "Kasus ISPA vs PM2.5, kelompok rentan, jeda paparan, dan beban rumah sakit.",
+    desc: "Kasus ISPA vs PM2.5, kelompok rentan, jeda paparan, beban RS.",
   },
   {
     href: "/evaluasi",
     icon: ShieldCheck,
     title: "Evaluasi & Rekomendasi",
     question: "Apa yang harus dilakukan?",
-    desc: "Kelengkapan jaringan AQMS, blind spot, usulan stasiun, dan rekomendasi bertahap.",
+    desc: "Kelengkapan jaringan, blind spot, usulan stasiun, rekomendasi.",
   },
 ]
 
 const HEADLINES = [
-  { value: `${COVERAGE.stations} / ${COVERAGE.hospitals}`, label: `Stasiun AQMS / RS rujukan · tersebar di ${COVERAGE.islands} pulau besar` },
+  { value: `${COVERAGE.stations} / ${COVERAGE.hospitals}`, label: `Stasiun AQMS / RS rujukan · ${COVERAGE.islands} pulau besar` },
   { value: `${COVERAGE.from.slice(0, 4)}–${COVERAGE.to.slice(0, 4)}`, label: `Periode observasi · ${idn(COVERAGE.days)} hari` },
   { value: String(COVERAGE.pollutants.length), label: `Parameter polutan · ${COVERAGE.pollutants.join(", ")}` },
   { value: String(COVERAGE.diseases.length), label: `Kategori dampak medis · ${COVERAGE.diseases.join(", ")}` },
@@ -72,162 +73,155 @@ const HEADLINES = [
 
 export function HomePage() {
   return (
-    <div className="mx-auto flex max-w-[1400px] flex-col gap-8 p-4 md:p-6 lg:p-8">
-      <section className="relative overflow-hidden rounded-2xl bg-sidebar text-sidebar-accent-foreground">
-        <Image
-          src="/images/hero-haze.png"
-          alt=""
-          fill
-          priority
-          sizes="(min-width: 1024px) 1100px, 100vw"
-          className="object-cover opacity-45"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-sidebar via-sidebar/85 to-sidebar/20" aria-hidden />
-        <div className="relative flex flex-col gap-6 px-6 py-10 md:px-10 md:py-14">
-          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium backdrop-blur">
-            <span className="relative flex size-2">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-sidebar-primary opacity-60" />
-              <span className="relative inline-flex size-2 rounded-full bg-sidebar-primary" />
-            </span>
-            Periode observasi {fmtDate(COVERAGE.from)} – {fmtDate(COVERAGE.to)}
-          </span>
-          <div className="max-w-2xl">
-            <h1 className="text-4xl font-bold tracking-tight md:text-6xl">SI-NAPAS</h1>
-            <p className="mt-3 text-xl font-semibold tracking-tight text-balance text-sidebar-primary md:text-2xl">
-              Menutup Titik Buta Pemantauan Udara & Melindungi Kelompok Rentan
-            </p>
-            <p className="mt-4 max-w-xl text-sm leading-relaxed text-sidebar-foreground/85 md:text-base text-pretty">
-              Satu tempat untuk membaca kondisi udara dari jaringan stasiun AQMS, memahami pola dan pemicunya,
-              mengukur dampaknya pada pasien rumah sakit, hingga menyusun rekomendasi kebijakan.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/overview"
-              className="inline-flex items-center gap-2 rounded-lg bg-sidebar-primary px-4 py-2.5 text-sm font-semibold text-sidebar-primary-foreground transition-opacity hover:opacity-90"
-            >
-              Mulai dari Overview
-              <ArrowRight className="size-4" aria-hidden />
-            </Link>
-            <Link
-              href="/evaluasi"
-              className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-sm font-semibold transition-colors hover:bg-white/10"
-            >
-              Lihat rekomendasi
-            </Link>
-          </div>
-          <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 md:grid-cols-4">
-            {HEADLINES.map((h) => (
-              <div key={h.label} className="bg-sidebar/70 px-4 py-4 backdrop-blur">
-                <dt className="text-xs text-sidebar-foreground/70">{h.label}</dt>
-                <dd className="mt-1 text-2xl font-bold tabular-nums">{h.value}</dd>
+    <div className="mx-auto flex max-w-[1400px] flex-col gap-4 p-4 md:p-6 lg:p-8">
+      {/* Baris 1: hero (kiri) + dua masalah (kanan) */}
+      <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+        <section className="relative overflow-hidden rounded-2xl bg-sidebar text-sidebar-accent-foreground">
+          <Image
+            src="/images/hero-haze.png"
+            alt=""
+            fill
+            priority
+            sizes="(min-width: 1024px) 800px, 100vw"
+            className="object-cover opacity-45"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-sidebar via-sidebar/85 to-sidebar/20" aria-hidden />
+          <div className="relative flex h-full flex-col justify-between gap-5 px-6 py-6 md:px-8 md:py-7">
+            <div className="flex flex-col gap-3">
+              <span className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium backdrop-blur">
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-sidebar-primary opacity-60" />
+                  <span className="relative inline-flex size-2 rounded-full bg-sidebar-primary" />
+                </span>
+                Periode observasi {fmtDate(COVERAGE.from)} – {fmtDate(COVERAGE.to)}
+              </span>
+              <div>
+                <h1 className="text-4xl font-bold tracking-tight md:text-5xl">SI-NAPAS</h1>
+                <p className="mt-2 max-w-xl text-lg font-semibold tracking-tight text-balance text-sidebar-primary md:text-xl">
+                  Menutup Titik Buta Pemantauan Udara & Melindungi Kelompok Rentan
+                </p>
+                <p className="mt-2 max-w-xl text-sm leading-relaxed text-sidebar-foreground/85 text-pretty">
+                  Membaca kondisi udara dari jaringan stasiun AQMS, mengukur dampaknya pada pasien rumah sakit, dan menyusun
+                  rekomendasi kebijakan.
+                </p>
               </div>
-            ))}
-          </dl>
-        </div>
-      </section>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/overview"
+                  className="inline-flex items-center gap-2 rounded-lg bg-sidebar-primary px-4 py-2 text-sm font-semibold text-sidebar-primary-foreground transition-opacity hover:opacity-90"
+                >
+                  Mulai dari Overview
+                  <ArrowRight className="size-4" aria-hidden />
+                </Link>
+                <Link
+                  href="/evaluasi"
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold transition-colors hover:bg-white/10"
+                >
+                  Lihat rekomendasi
+                </Link>
+              </div>
+            </div>
+            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 md:grid-cols-4">
+              {HEADLINES.map((h) => (
+                <div key={h.label} className="bg-sidebar/70 px-3 py-3 backdrop-blur">
+                  <dt className="text-[11px] leading-snug text-sidebar-foreground/70">{h.label}</dt>
+                  <dd className="mt-1 text-xl font-bold tabular-nums">{h.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </section>
 
-      <section aria-labelledby="mengapa" className="flex flex-col gap-4">
-        <div>
-          <p className="text-xs font-semibold tracking-wider text-primary uppercase">Mengapa SI-NAPAS</p>
-          <h2 id="mengapa" className="mt-1 text-xl font-bold tracking-tight">
-            Dua masalah yang dijawab dasbor ini
-          </h2>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
+        <section aria-label="Dua masalah yang dijawab" className="grid gap-4">
           <article className="flex flex-col rounded-xl border bg-card p-5 shadow-xs">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-              <EyeOff className="size-5" aria-hidden />
-            </span>
-            <h3 className="mt-4 font-semibold">Titik buta pemantauan</h3>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              {COVERAGE.isolatedStations} stasiun (Sorong dan Merauke) berjarak lebih dari {idn(COVERAGE.isolatedKm)} km dari stasiun lain,
-              sehingga wilayah sekitarnya praktis hanya dipantau satu titik. {COVERAGE.defective} stasiun rusak dan{" "}
-              {COVERAGE.intermittent} intermiten; kelengkapan jam valid jaringan {COVERAGE.completeness.toLocaleString("id-ID", { minimumFractionDigits: 1 })}%.
+            <div className="flex items-center gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                <EyeOff className="size-5" aria-hidden />
+              </span>
+              <h2 className="font-semibold">Titik buta pemantauan</h2>
+            </div>
+            <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
+              {COVERAGE.isolatedStations} stasiun (Sorong, Merauke) berjarak &gt; {idn(COVERAGE.isolatedKm)} km dari stasiun lain. {COVERAGE.defective}{" "}
+              stasiun rusak, {COVERAGE.intermittent} intermiten; kelengkapan jam valid {pct(COVERAGE.completeness)}%.
             </p>
-            <Link href="/evaluasi" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold">
+            <Link href="/evaluasi" className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold">
               Lihat peta evaluasi & usulan stasiun
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           </article>
           <article className="flex flex-col rounded-xl border bg-card p-5 shadow-xs">
-            <span className="flex size-10 items-center justify-center rounded-lg bg-warning/15 text-[oklch(0.5_0.13_55)]">
-              <Users className="size-5" aria-hidden />
-            </span>
-            <h3 className="mt-4 font-semibold">Kelompok rentan</h3>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Dari {idn(COVERAGE.ispaCases)} kasus ISPA di RS rujukan selama periode observasi, rawat inap pernapasan lebih banyak
-              berasal dari lansia (&gt;60 th, {COVERAGE.lansiaPct.toLocaleString("id-ID", { minimumFractionDigits: 1 })}%) dibanding balita
-              (&lt;5 th, {COVERAGE.balitaPct.toLocaleString("id-ID", { minimumFractionDigits: 1 })}%).
+            <div className="flex items-center gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning/15 text-[oklch(0.5_0.13_55)]">
+                <Users className="size-5" aria-hidden />
+              </span>
+              <h2 className="font-semibold">Kelompok rentan</h2>
+            </div>
+            <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">
+              Dari {idn(COVERAGE.ispaCases)} kasus ISPA di RS rujukan, rawat inap pernapasan lebih banyak dari lansia (&gt;60 th,{" "}
+              {pct(COVERAGE.lansiaPct)}%) daripada balita (&lt;5 th, {pct(COVERAGE.balitaPct)}%).
             </p>
-            <Link href="/dampak-kesehatan" className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold">
+            <Link href="/dampak-kesehatan" className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold">
               Lihat dampak kesehatan per kelompok usia
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           </article>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section aria-labelledby="alur" className="flex flex-col gap-4">
-        <div>
-          <p className="text-xs font-semibold tracking-wider text-primary uppercase">Alur analisis</p>
-          <h2 id="alur" className="mt-1 text-xl font-bold tracking-tight">
-            Empat pertanyaan, empat halaman
-          </h2>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {SECTIONS.map((s, i) => {
-            const Icon = s.icon
-            return (
-              <Link
-                key={s.href}
-                href={s.href}
-                className="group flex flex-col rounded-xl border bg-card p-5 shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="flex size-10 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                    <Icon className="size-5" aria-hidden />
-                  </span>
-                  <span className="font-mono text-xs text-muted-foreground">0{i + 1}</span>
-                </div>
-                <h3 className="mt-4 font-semibold">{s.title}</h3>
-                <p className="mt-1 text-sm font-medium text-primary">{s.question}</p>
-                <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{s.desc}</p>
-                <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                  Buka halaman
-                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden />
+      {/* Baris 2: empat halaman */}
+      <section aria-label="Empat pertanyaan, empat halaman" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {SECTIONS.map((s, i) => {
+          const Icon = s.icon
+          return (
+            <Link
+              key={s.href}
+              href={s.href}
+              className="group flex flex-col rounded-xl border bg-card p-4 shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+            >
+              <div className="flex items-center gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+                  <Icon className="size-5" aria-hidden />
                 </span>
-              </Link>
-            )
-          })}
-        </div>
+                <h3 className="font-semibold">{s.title}</h3>
+                <span className="ml-auto font-mono text-xs text-muted-foreground">0{i + 1}</span>
+              </div>
+              <p className="mt-3 text-sm font-medium text-primary">{s.question}</p>
+              <p className="mt-1 flex-1 text-xs leading-relaxed text-muted-foreground">{s.desc}</p>
+              <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                Buka halaman
+                <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden />
+              </span>
+            </Link>
+          )
+        })}
       </section>
 
+      {/* Baris 3: ISPU + sumber data */}
       <section className="grid gap-4 lg:grid-cols-5">
-        <div className="rounded-xl border bg-card p-5 shadow-xs lg:col-span-3">
-          <h2 className="text-sm font-semibold">Cara membaca kategori ISPU</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Indeks Standar Pencemar Udara (ISPU) mengikuti Permen LHK No. 14/2020.
-          </p>
-          <ul className="mt-4 grid gap-2 sm:grid-cols-5">
+        <div className="rounded-xl border bg-card p-4 shadow-xs lg:col-span-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <h2 className="text-sm font-semibold">Cara membaca kategori ISPU</h2>
+            <p className="text-[11px] text-muted-foreground">Indeks Standar Pencemar Udara, Permen LHK No. 14/2020</p>
+          </div>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-5">
             {ISPU_CATEGORIES.map((c) => (
-              <li key={c.key} className="flex flex-col gap-2 rounded-lg border p-3">
+              <li key={c.key} className="flex flex-col gap-1.5 rounded-lg border p-2.5">
                 <span className="h-1.5 w-full rounded-full" style={{ backgroundColor: c.color }} aria-hidden />
-                <span className="text-sm font-semibold">{c.label}</span>
-                <span className="font-mono text-xs text-muted-foreground">ISPU {c.range}</span>
+                <span className="text-xs font-semibold leading-tight">{c.label}</span>
+                <span className="font-mono text-[11px] text-muted-foreground">ISPU {c.range}</span>
               </li>
             ))}
           </ul>
         </div>
-        <div className="rounded-xl border bg-card p-5 shadow-xs lg:col-span-2">
+        <div className="rounded-xl border bg-card p-4 shadow-xs lg:col-span-2">
           <h2 className="text-sm font-semibold">Sumber data & catatan</h2>
-          <ul className="mt-4 flex flex-col gap-3 text-sm">
+          <ul className="mt-3 flex flex-col gap-2.5 text-sm">
             <li className="flex gap-3">
               <Radio className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
               <span>
                 <span className="font-medium">AQMS per jam</span>
                 <span className="block text-xs text-muted-foreground">
-                  {COVERAGE.operating} stasiun beroperasi dari {COVERAGE.stations} terdaftar ({COVERAGE.intermittent} intermiten) · PM2.5, PM10, CO, SO₂, NO₂, O₃
+                  {COVERAGE.operating} stasiun beroperasi dari {COVERAGE.stations} terdaftar ({COVERAGE.intermittent} intermiten)
                 </span>
               </span>
             </li>
@@ -243,7 +237,7 @@ export function HomePage() {
               <span>
                 <span className="font-medium">Catatan kualitas data</span>
                 <span className="block text-xs text-muted-foreground">
-                  Data nyata AQMS dan RS rujukan yang sudah lolos QC (valid). Hari ketika sensor macet dikecualikan dari rata-rata konsentrasi.
+                  Lolos QC (valid); hari sensor macet dikecualikan dari rata-rata konsentrasi.
                 </span>
               </span>
             </li>
