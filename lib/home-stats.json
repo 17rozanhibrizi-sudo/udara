@@ -1,0 +1,26 @@
+{
+  "stations": {
+    "total": 27,
+    "operating": 26,
+    "intermittent": 3,
+    "defective": 1
+  },
+  "last30": {
+    "from": "2026-09-15",
+    "to": "2026-10-14",
+    "days": 30,
+    "pm25Kalimantan": 330.9,
+    "ispaNasional": 35564,
+    "ispaKalimantan": 14054,
+    "completeness": 92.8
+  },
+  "all": {
+    "from": "2024-01-01",
+    "to": "2026-10-14",
+    "days": 1018,
+    "pm25Kalimantan": 52.3,
+    "ispaNasional": 688345,
+    "ispaKalimantan": 162355,
+    "completeness": 93.0
+  }
+}
