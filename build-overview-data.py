@@ -3,7 +3,7 @@
 Bangun public/data/overview.json dari dataset_clean (CSV bersih).
 
 Pemakaian (dari root project):
-    python scripts/build-overview-data.py <folder dataset_clean> [public/data/overview.json]
+    python scripts/build-overview-data.py <folder dataset_clean> [public/data/overview.json] [--drop-stuck]
 
 Butuh: pandas (pip install pandas)
 Sumber : 01_master_station_hospital.csv, 03_aqms_daily_ispu.csv, 00_qc_audit_stations.csv
@@ -13,8 +13,12 @@ import json, sys
 from pathlib import Path
 import pandas as pd
 
-src = Path(sys.argv[1] if len(sys.argv) > 1 else "dataset_clean")
-out = Path(sys.argv[2] if len(sys.argv) > 2 else "public/data/overview.json")
+args = [a for a in sys.argv[1:] if not a.startswith("--")]
+src = Path(args[0] if len(args) > 0 else "dataset_clean")
+out = Path(args[1] if len(args) > 1 else "public/data/overview.json")
+# Default: data dipakai APA ADANYA dari dataset_clean. Tambahkan --drop-stuck untuk membuang
+# hari sensor macet (lihat blok "Saring sensor macet" di bawah).
+DROP_STUCK = "--drop-stuck" in sys.argv
 
 master = pd.read_csv(src / "01_master_station_hospital.csv")
 daily = pd.read_csv(src / "03_aqms_daily_ispu.csv", parse_dates=["date"])
@@ -48,6 +52,33 @@ def short_city(s: str) -> str:
     if s.startswith("Kota "):
         return s[len("Kota "):]
     return s
+
+# --- Saring sensor macet (OPSIONAL, hanya jalan dengan --drop-stuck) ----------------
+# Hari dibuang bila keenam konsentrasi IDENTIK dengan hari sebelumnya selama >= STUCK_MIN_DAYS
+# hari kalender berturut-turut (ciri sensor macet / data diisi ulang, bukan kondisi udara).
+if DROP_STUCK:
+    STUCK_MIN_DAYS = 3
+    daily = daily.sort_values(["station_code", "date"]).reset_index(drop=True)
+    vals = daily[list(CONC.values())].round(2)
+    same_prev = (
+        (vals == vals.shift()).all(axis=1)
+        & (daily["station_code"] == daily["station_code"].shift())
+        & ((daily["date"] - daily["date"].shift()).dt.days == 1)
+    )
+    run_id = (~same_prev).cumsum()                      # satu id per rangkaian hari identik
+    run_len = daily.groupby(run_id)["date"].transform("size")
+    stuck = run_len >= STUCK_MIN_DAYS
+    # Margin 1 hari di kedua sisi: hari saat sensor mulai/selesai macet berisi campuran jam macet & normal.
+    same_station_next = daily["station_code"] == daily["station_code"].shift(-1)
+    same_station_prev = daily["station_code"] == daily["station_code"].shift()
+    stuck = stuck | (stuck.shift(1, fill_value=False) & same_station_prev) | (stuck.shift(-1, fill_value=False) & same_station_next)
+    dropped = daily[stuck].groupby("station_code").size()
+    print(f"Dibuang (sensor macet >= {STUCK_MIN_DAYS} hari identik, +1 hari margin): {int(stuck.sum())} baris")
+    for code, n in dropped.items():
+        rows = daily[stuck & (daily.station_code == code)]
+        print(f"  {code}: {n} hari ({rows.date.min().date()} .. {rows.date.max().date()})")
+    daily = daily[~stuck].reset_index(drop=True)
+
 
 base = daily["date"].min().normalize()
 stations = []
