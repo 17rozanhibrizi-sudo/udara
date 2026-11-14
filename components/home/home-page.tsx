@@ -2,6 +2,19 @@ import Image from "next/image"
 import Link from "next/link"
 import { ArrowRight, BarChart3, Database, HeartPulse, LayoutDashboard, Radio, ShieldCheck } from "lucide-react"
 import { ISPU_CATEGORIES } from "@/lib/data"
+import stats from "@/lib/home-stats.json"
+
+/** "last30" = 30 hari terakhir data (sama dengan default dashboard); "all" = seluruh periode data */
+const PERIOD: "last30" | "all" = "last30"
+
+const win = stats[PERIOD]
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+const fmtDate = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number)
+  return `${d} ${MONTHS[m - 1]} ${y}`
+}
+const idn = (n: number, digits = 0) => n.toLocaleString("id-ID", { minimumFractionDigits: digits, maximumFractionDigits: digits })
+const periodLabel = PERIOD === "last30" ? "30 hari terakhir" : "seluruh periode"
 
 const SECTIONS = [
   {
@@ -35,10 +48,10 @@ const SECTIONS = [
 ]
 
 const HEADLINES = [
-  { value: "27", label: "Stasiun AQMS aktif" },
-  { value: "47,8", label: "µg/m³ rata-rata PM2.5 Kalimantan" },
-  { value: "1.754", label: "Pasien ISPA · Okt 2025" },
-  { value: "94,6%", label: "Kelengkapan data jaringan" },
+  { value: idn(stats.stations.operating), label: `Stasiun AQMS beroperasi (dari ${stats.stations.total} terdaftar)` },
+  { value: win.pm25Kalimantan == null ? "–" : idn(win.pm25Kalimantan, 1), label: `µg/m³ rata-rata PM2.5 Kalimantan · ${periodLabel}` },
+  { value: idn(win.ispaNasional), label: `Kasus ISPA di RS rujukan · ${periodLabel}` },
+  { value: win.completeness == null ? "–" : `${idn(win.completeness, 1)}%`, label: `Kelengkapan data jaringan · ${periodLabel}` },
 ]
 
 export function HomePage() {
@@ -60,7 +73,7 @@ export function HomePage() {
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-sidebar-primary opacity-60" />
               <span className="relative inline-flex size-2 rounded-full bg-sidebar-primary" />
             </span>
-            Pemantauan periode 1–31 Oktober 2025 · data dummy
+            Pemantauan periode {fmtDate(win.from)} – {fmtDate(win.to)}
           </span>
           <div className="max-w-2xl">
             <h1 className="text-3xl font-bold tracking-tight text-balance md:text-5xl">
@@ -155,7 +168,10 @@ export function HomePage() {
               <Radio className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
               <span>
                 <span className="font-medium">AQMS per jam</span>
-                <span className="block text-xs text-muted-foreground">27 stasiun · PM2.5, PM10, CO, SO₂, NO₂, O₃</span>
+                <span className="block text-xs text-muted-foreground">
+                  {stats.stations.operating} stasiun beroperasi dari {stats.stations.total} terdaftar
+                  {stats.stations.intermittent ? ` (${stats.stations.intermittent} intermiten)` : ""} · PM2.5, PM10, CO, SO₂, NO₂, O₃
+                </span>
               </span>
             </li>
             <li className="flex gap-3">
@@ -170,7 +186,7 @@ export function HomePage() {
               <span>
                 <span className="font-medium">Status data</span>
                 <span className="block text-xs text-muted-foreground">
-                  Seluruh angka adalah data dummy untuk keperluan prototipe.
+                  Data nyata AQMS dan RS rujukan yang sudah lolos QC (valid). Hari ketika sensor macet dikecualikan dari rata-rata konsentrasi.
                 </span>
               </span>
             </li>
