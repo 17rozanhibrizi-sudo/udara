@@ -1,256 +1,160 @@
-"use client"
+#!/usr/bin/env python3
+"""
+Bangun public/data/evaluasi.json untuk halaman Evaluasi Jaringan & Rekomendasi Kebijakan.
 
-import { useMemo, useState } from "react"
-import { CalendarClock, Gauge, TrendingDown, TrendingUp } from "lucide-react"
-import { FilterBar } from "@/components/dashboard/filter-bar"
-import { useFilters } from "@/components/dashboard/filter-context"
-import { KpiCard, LegendDot, PageHeader, Panel } from "@/components/dashboard/widgets"
-import { StationMap } from "@/components/maps"
-import {
-  DEFAULT_RANGE,
-  ISPU_CATEGORIES,
-  POLLUTANTS,
-  POLLUTANT_COLORS,
-  formatId,
-  formatRangeShort,
-  getDailySeries,
-  getDailySeriesAll,
-  getExceedance,
-  getOverviewKpis,
-  getOverviewStations,
-  getPollutant,
-  getRegion,
-  previousYearRange,
-  resolvePollutant,
-  type PollutantSelection,
-} from "@/lib/data"
-import { DailyTrendChart, ExceedanceChart, IspuDistributionChart, MultiTrendChart, YoyChart } from "./overview-charts"
+Pemakaian (dari root project):
+    python scripts/build-evaluasi-data.py <folder dataset_clean> [public/data/evaluasi.json] [--drop-stuck]
 
-export function OverviewDashboard() {
-  const { region, pollutant: rawSelection, range } = useFilters()
-  const selection = rawSelection as PollutantSelection
-  const isAll = selection === "ALL"
-  // Panel/hitungan yang hanya cocok untuk satu polutan memakai PM2.5 saat "Semua polutan"
-  const pollutant = resolvePollutant(selection)
-  const [selected, setSelected] = useState<string | null>(null)
+Butuh: pandas, numpy, global-land-mask  (pip install pandas numpy global-land-mask)
+       global-land-mask hanya dipakai untuk kandidat titik usulan stasiun baru (agar jatuh di daratan).
+       Bila tidak terpasang, kandidat dikosongkan dan peta tidak menampilkan titik usulan.
 
-  const pol = getPollutant(pollutant)
-  const reg = getRegion(region)
-  const kpi = useMemo(() => getOverviewKpis({ region, pollutant, range }), [region, pollutant, range])
-  const daily = useMemo(() => getDailySeries({ region, pollutant, range }), [region, pollutant, range])
-  const dailyAll = useMemo(() => (isAll ? getDailySeriesAll({ region, range }) : []), [isAll, region, range])
-  const allKpis = useMemo(
-    () =>
-      isAll
-        ? POLLUTANTS.map((p) => ({ p, ...getOverviewKpis({ region, pollutant: p.value, range }) }))
-        : [],
-    [isAll, region, range],
-  )
-  const exceed = useMemo(() => getExceedance({ region, range }), [region, range])
-  // Semua stasiun di wilayah (termasuk yang tanpa data → tetap tampil di peta, abu-abu)
-  const stations = useMemo(() => getOverviewStations({ region, selection, range }), [region, selection, range])
-  const withData = useMemo(() => stations.filter((s) => s.hasData), [stations])
-  const selectedStation = stations.find((s) => s.code === selected)
-  // Grafik bawah: hanya stasiun yang punya data; diurutkan dari ISPU rata-rata tertinggi
-  const tableStations = useMemo(() => {
-    const list = selected ? withData.filter((s) => s.code === selected) : withData
-    return [...list].sort((a, b) => b.ispuNow - a.ispuNow)
-  }, [selected, withData])
+Sumber (nama pada spesifikasi -> file sebenarnya di dataset_clean):
+    sites.csv / hospitals.csv     -> 01_master_station_hospital.csv   (profil stasiun, baseline_pm25, RS, kelas, TT)
+    HLT-01_health_outcomes_daily  -> 04_env_health_daily_ready.csv    (kasus harian per RS + pm25 harian)
+    qc_flag == 'VALID'            -> baris per jam pada hourly_by_station/<station>.csv (file itu sudah hanya berisi baris valid)
+                                     dihitung per tanggal agar kelengkapan bisa mengikuti rentang tanggal.
+                                     (00_qc_audit_stations.csv dipakai sebagai pembanding, tidak dimuat ke JSON)
 
-  const hasData = isAll ? allKpis.some((k) => k.hasData) : kpi.hasData
-  const stationCount = isAll ? Math.max(0, ...allKpis.map((k) => k.stationCount)) : kpi.stationCount
+--drop-stuck : PM2.5 pada hari sensor macet diisi null (kasus RS tetap dihitung). Aturannya SAMA dengan
+               build-overview-data.py / build-health-data.py / build-pola-data.py.
 
-  // Ringkasan KPI untuk mode "Semua polutan"
-  const mean = (v: number[]) => v.reduce((a, b) => a + b, 0) / Math.max(v.length, 1)
-  const avgPct = isAll && hasData ? mean(allKpis.filter((k) => k.hasData).map((k) => (k.avg / k.p.standard) * 100)) : 0
-  const worstDays = isAll && hasData ? allKpis.reduce((a, b) => (b.above > a.above ? b : a), allKpis[0]) : null
-  const yoyList = isAll ? allKpis.map((k) => k.yoy).filter(Number.isFinite) : []
-  const yoy = isAll ? (yoyList.length ? Math.round(mean(yoyList) * 10) / 10 : NaN) : kpi.yoy
-  const yoyOk = Number.isFinite(yoy)
-  const worse = yoy >= 0
-  const prevYear = previousYearRange(range).from.slice(0, 4)
-  const noData = (s: { status: string }) =>
-    s.status === "Defective"
-      ? "Stasiun ini rusak (Defective) — tidak ada data yang tersedia."
-      : "Stasiun ini belum punya data pada rentang tanggal terpilih."
+Catatan: dataset tidak punya koordinat RS (1 stasiun = 1 RS di kota yang sama), jadi tidak ada jarak RS-stasiun.
+"""
+import json, math, sys
+from pathlib import Path
+import numpy as np
+import pandas as pd
 
-  return (
-    <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:p-8">
-      <PageHeader
-        eyebrow="01 · Overview"
-        title="Overview Kualitas Udara"
-        description="Ringkasan konsentrasi polutan, jumlah hari melampaui baku mutu, dan kategori ISPU per stasiun AQMS."
-        dummy={false}
-      />
-      <FilterBar show={["region", "pollutant", "period"]} note={`Default = Kalimantan, PM2.5, ${formatRangeShort(DEFAULT_RANGE)}`} />
+args = [a for a in sys.argv[1:] if not a.startswith("--")]
+src = Path(args[0] if len(args) > 0 else "dataset_clean")
+out = Path(args[1] if len(args) > 1 else "public/data/evaluasi.json")
+DROP_STUCK = "--drop-stuck" in sys.argv
 
-      {!hasData && (
-        <div role="status" className="rounded-lg border border-dashed bg-card p-4 text-sm text-muted-foreground">
-          Belum ada data AQMS untuk {reg.label} pada {formatRangeShort(range)}. Coba ubah wilayah atau rentang tanggal.
-        </div>
-      )}
+master = pd.read_csv(src / "01_master_station_hospital.csv")
+d = pd.read_csv(src / "04_env_health_daily_ready.csv", parse_dates=["date"]).sort_values(["station_code", "date"]).reset_index(drop=True)
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        {isAll ? (
-          <KpiCard
-            label="Rata-rata terhadap baku mutu"
-            value={hasData ? `${formatId(avgPct)}%` : "–"}
-            caption={`6 polutan · ${reg.label} · ${formatRangeShort(range)}`}
-            icon={<Gauge className="size-4" aria-hidden />}
-          />
-        ) : (
-          <KpiCard
-            label={`Rata-rata ${pol.label} (µg/m³)`}
-            value={hasData ? formatId(kpi.avg) : "–"}
-            caption={`${reg.label} · ${formatRangeShort(range)}`}
-            icon={<Gauge className="size-4" aria-hidden />}
-          />
-        )}
-        {isAll && worstDays ? (
-          <KpiCard
-            label="Hari di atas baku mutu (terbanyak)"
-            value={
-              <>
-                {worstDays.above}{" "}
-                <span className="text-lg font-semibold text-muted-foreground">dari {worstDays.days} hari</span>
-              </>
-            }
-            caption={`Polutan terbanyak: ${worstDays.p.label} · rata-rata ${worstDays.stationCount} stasiun`}
-            tone="warning"
-            icon={<CalendarClock className="size-4" aria-hidden />}
-          />
-        ) : (
-          <KpiCard
-            label="Hari di atas baku mutu"
-            value={
-              <>
-                {kpi.above} <span className="text-lg font-semibold text-muted-foreground">dari {kpi.days} hari</span>
-              </>
-            }
-            caption={`Rata-rata ${stationCount} stasiun · BM 24 jam: ${pol.standard.toLocaleString("id-ID")} µg/m³`}
-            tone="warning"
-            icon={<CalendarClock className="size-4" aria-hidden />}
-          />
-        )}
-        <KpiCard
-          label="Perubahan YoY"
-          value={
-            yoyOk ? (
-              <span className="inline-flex items-center gap-2">
-                {worse ? <TrendingUp className="size-6" aria-hidden /> : <TrendingDown className="size-6" aria-hidden />}
-                {formatId(Math.abs(yoy))}%
-                <span className="text-lg font-semibold">{worse ? "lebih buruk" : "lebih baik"}</span>
-              </span>
-            ) : (
-              "N/A"
-            )
-          }
-          caption={
-            yoyOk
-              ? isAll
-                ? `Rata-rata 6 polutan dibanding periode yang sama tahun ${prevYear}`
-                : `Dibanding periode yang sama tahun ${prevYear}`
-              : "Data periode yang sama tahun sebelumnya belum tersedia"
-          }
-          tone={yoyOk ? (worse ? "danger" : "success") : undefined}
-        />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-5">
-        <Panel
-          className="lg:col-span-2"
-          title="Peta stasiun AQMS"
-          subtitle="Warna = kategori ISPU rata-rata periode · abu-abu = tidak ada data · klik stasiun untuk memfilter"
-          action={
-            selectedStation ? (
-              <button
-                onClick={() => setSelected(null)}
-                className="rounded-md bg-accent px-2 py-1 text-[11px] font-medium text-accent-foreground hover:bg-accent/70"
-              >
-                {selectedStation.name} ✕
-              </button>
-            ) : null
-          }
-        >
-          <div className="h-72">
-            <StationMap stations={stations} selected={selected} onSelect={setSelected} />
-          </div>
-          <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
-            {ISPU_CATEGORIES.map((c) => (
-              <LegendDot key={c.key} color={c.color} label={c.label} />
-            ))}
-            {stations.some((s) => !s.hasData) && <LegendDot color="#9ca3af" label="Tanpa data / nonaktif" />}
-          </div>
-        </Panel>
-        <Panel
-          className="lg:col-span-3"
-          title={
-            isAll
-              ? `Tren harian semua polutan (% baku mutu) · ${reg.label}`
-              : `Tren harian ${pol.label} (µg/m³) · ${reg.label}`
-          }
-          subtitle={
-            isAll
-              ? "100% = tepat di baku mutu 24 jam masing-masing polutan"
-              : "AQMS harian, rata-rata stasiun di wilayah terpilih"
-          }
-          action={
-            isAll ? (
-              <div className="hidden flex-wrap gap-x-3 gap-y-1 sm:flex">
-                {POLLUTANTS.map((p) => (
-                  <LegendDot key={p.value} color={POLLUTANT_COLORS[p.value]} label={p.label} shape="line" />
-                ))}
-              </div>
-            ) : (
-              <div className="hidden gap-3 sm:flex">
-                <LegendDot color="var(--chart-1)" label={pol.label} shape="line" />
-                <LegendDot color="var(--chart-4)" label={`Baku mutu (${pol.standard})`} shape="line" />
-              </div>
-            )
-          }
-        >
-          {isAll ? (
-            <MultiTrendChart data={dailyAll} />
-          ) : (
-            <DailyTrendChart data={daily} standard={pol.standard} label={pol.label} />
-          )}
-        </Panel>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Panel
-          title="Polutan vs baku mutu"
-          subtitle="% hari melampaui baku mutu"
-          footnote={
-            isAll ? "Menampilkan 6 polutan sekaligus" : `Menampilkan 6 polutan; polutan terpilih (${pol.label}) disorot`
-          }
-        >
-          <ExceedanceChart data={exceed} active={isAll ? "ALL" : pollutant} />
-        </Panel>
-        <Panel title="Distribusi kategori ISPU per stasiun" subtitle="Proporsi hari (0–100%)">
-          {selectedStation && !selectedStation.hasData ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">{noData(selectedStation)}</p>
-          ) : (
-            <IspuDistributionChart stations={tableStations} />
-          )}
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5">
-            {ISPU_CATEGORIES.map((c) => (
-              <LegendDot key={c.key} color={c.color} label={c.label} shape="square" />
-            ))}
-          </div>
-        </Panel>
-        <Panel
-          title="Perubahan konsentrasi YoY per stasiun"
-          subtitle="Kanan (+) memburuk · kiri (−) membaik"
-          footnote="Garis acuan 0%"
-        >
-          {selectedStation && !selectedStation.hasData ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">{noData(selectedStation)}</p>
-          ) : (
-            <YoyChart stations={tableStations} />
-          )}
-        </Panel>
-      </div>
-    </div>
-  )
+REGION = {
+    "DKI Jakarta": "jawa", "Jawa Barat": "jawa", "D.I. Yogyakarta": "jawa", "Jawa Timur": "jawa",
+    "Aceh": "sumatera", "Sumatera Utara": "sumatera", "Sumatera Barat": "sumatera", "Riau": "sumatera",
+    "Kepulauan Riau": "sumatera", "Jambi": "sumatera", "Bengkulu": "sumatera",
+    "Sumatera Selatan": "sumatera", "Lampung": "sumatera",
+    "Kalimantan Barat": "kalimantan", "Kalimantan Tengah": "kalimantan",
+    "Kalimantan Selatan": "kalimantan", "Kalimantan Timur": "kalimantan",
+    "Sulawesi Selatan": "sulawesi", "Sulawesi Tengah": "sulawesi",
+    "Papua Barat Daya": "maluku-papua", "Papua Selatan": "maluku-papua",
 }
+missing = set(master.provinsi) - set(REGION)
+if missing:
+    sys.exit(f"Provinsi belum dipetakan ke wilayah: {missing}")
+
+CONC = ["pm25_ug_m3", "pm10_ug_m3", "so2_ug_m3", "co_ug_m3", "o3_ug_m3", "no2_ug_m3"]
+
+
+def short_city(s):
+    s = s.replace("Kota Administrasi ", "")
+    if s.startswith("Kabupaten "):
+        return "Kab. " + s[len("Kabupaten "):]
+    if s.startswith("Kota "):
+        return s[len("Kota "):]
+    return s
+
+
+# ---------- sensor macet (sama dengan build-health-data.py) ----------
+stuck = pd.Series(False, index=d.index)
+if DROP_STUCK:
+    vals = d[CONC].round(2)
+    same_prev = ((vals == vals.shift()).all(axis=1) & (d.station_code == d.station_code.shift())
+                 & ((d.date - d.date.shift()).dt.days == 1))
+    run_id = (~same_prev).cumsum()
+    stuck = d.groupby(run_id)["date"].transform("size") >= 3
+    nxt = d.station_code == d.station_code.shift(-1)
+    prv = d.station_code == d.station_code.shift()
+    stuck = stuck | (stuck.shift(1, fill_value=False) & prv) | (stuck.shift(-1, fill_value=False) & nxt)
+    print(f"Hari sensor macet (PM2.5 dikosongkan): {int(stuck.sum())}")
+
+base = d["date"].min().normalize()
+n_days = int((d["date"].max().normalize() - base).days) + 1
+HOURLY = src / "hourly_by_station"
+
+
+def haversine(a, b):
+    R = 6371.0088
+    p1, p2 = math.radians(a[0]), math.radians(b[0])
+    dp, dl = p2 - p1, math.radians(b[1] - a[1])
+    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * R * math.asin(math.sqrt(h))
+
+
+stations = []
+for _, m in master.iterrows():
+    mask = d.station_code == m.station_code
+    g = d[mask]
+    st = stuck[mask].values
+    idx = ((g["date"] - base).dt.days).astype(int).tolist()
+    deltas = [idx[0]] + [b - a for a, b in zip(idx, idx[1:])] if idx else []
+    pm = g["pm25_ug_m3"].round(2).astype(object)
+    pm[st] = None
+    cases = (g["resp"] + g["cvd"] + g["death"]).astype(int).tolist()  # beban kasus = resp + cvd + death
+
+    # jam valid per hari kalender (0..24) + profil rata-rata PM2.5 per jam (WIB)
+    valid = [0] * n_days
+    prof = None
+    hp = HOURLY / f"{m.station_code}.csv"
+    if hp.exists():
+        h = pd.read_csv(hp, parse_dates=["date"]).drop_duplicates(["date", "hour"])
+        cnt = h.groupby("date").size()
+        for dt, c in cnt.items():
+            k = int((dt - base).days)
+            if 0 <= k < n_days:
+                valid[k] = int(c)
+        hh = h
+        if DROP_STUCK and st.any():
+            bad = set(g["date"][st])
+            hh = h[~h["date"].isin(bad)]
+        pr = hh.groupby("hour")["pm25_ug_m3"].mean().reindex(range(24))
+        prof = [None if pd.isna(x) else round(float(x), 1) for x in pr.tolist()]
+
+    stations.append({
+        "code": m.station_code,
+        "hospitalId": m.hospital_id,
+        "name": short_city(m.kota_kabupaten),
+        "fullName": m.nama_sensor.replace("AQMS ", "", 1),
+        "province": m.provinsi,
+        "region": REGION[m.provinsi],
+        "type": m.site_type,
+        "status": m.status_operasional,
+        "lat": float(m.latitude_dd),
+        "lng": float(m.longitude_dd),
+        "baseline": float(m.baseline_pm25),
+        "hospital": {"name": m.nama_rumah_sakit, "cls": m.kelas_faskes, "beds": int(m.kapasitas_tempat_tidur)},
+        "hp": prof,
+        "d": deltas,
+        "p": [None if (x is None or pd.isna(x)) else float(x) for x in pm.tolist()],
+        "h": cases,
+        "v": valid,
+    })
+
+# ---------- kandidat titik usulan stasiun baru ----------
+# Grid 0,25 derajat di daratan Indonesia, minimal 50 km dari SEMUA stasiun beroperasi (Active / Intermittent).
+cand = []
+try:
+    from global_land_mask import globe
+    live = [(s["lat"], s["lng"]) for s in stations if s["status"] != "Defective"]
+    lats = np.arange(-11.0, 6.01, 0.25)
+    lngs = np.arange(95.0, 141.01, 0.25)
+    LL, GG = np.meshgrid(lats, lngs, indexing="ij")
+    land = globe.is_land(LL, GG)
+    for la, ln in zip(LL[land], GG[land]):
+        if min(haversine((la, ln), p) for p in live) >= 50.0:
+            cand.append([round(float(la), 2), round(float(ln), 2)])
+    print(f"Kandidat titik usulan (daratan, >= 50 km dari stasiun): {len(cand)}")
+except ImportError:
+    print("PERINGATAN: global-land-mask belum terpasang -> kandidat titik usulan kosong")
+
+payload = {"version": 1, "base": base.strftime("%Y-%m-%d"), "max": d["date"].max().strftime("%Y-%m-%d"),
+           "days": n_days, "stations": stations, "cand": cand}
+out.parent.mkdir(parents=True, exist_ok=True)
+out.write_text(json.dumps(payload, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+print(f"OK -> {out} ({out.stat().st_size/1e6:.2f} MB, {len(stations)} stasiun, "
+      f"{sum(1 for s in stations if s['d'])} punya data, {payload['base']} .. {payload['max']})")
