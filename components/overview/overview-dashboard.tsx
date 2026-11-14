@@ -80,6 +80,7 @@ export function OverviewDashboard() {
         eyebrow="01 · Overview"
         title="Overview Kualitas Udara"
         description="Ringkasan konsentrasi polutan, jumlah hari melampaui baku mutu, dan kategori ISPU per stasiun AQMS."
+        dummy={false}
       />
       <FilterBar show={["region", "pollutant", "period"]} note={`Default = Kalimantan, PM2.5, ${formatRangeShort(DEFAULT_RANGE)}`} />
 
