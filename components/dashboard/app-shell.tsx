@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Activity, BarChart3, HeartPulse, House, LayoutDashboard, ShieldCheck, Wind } from "lucide-react"
+import { BarChart3, HeartPulse, House, LayoutDashboard, ShieldCheck, Wind } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export const NAV_ITEMS = [
@@ -13,18 +13,15 @@ export const NAV_ITEMS = [
   { href: "/evaluasi", label: "Evaluasi & Rekomendasi", icon: ShieldCheck },
 ]
 
-/** Halaman yang sudah memakai data nyata. Tambahkan href lain di sini saat halamannya selesai dikerjakan. */
-const LIVE_PAGES = ["/overview", "/pola-faktor", "/dampak-kesehatan", "/evaluasi"]
-
 function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2.5" aria-label="Gelar Rasa - beranda">
+    <Link href="/" className="flex items-center gap-2.5" aria-label="SI-NAPAS - beranda">
       <span className="flex size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
         <Wind className="size-5" aria-hidden />
       </span>
       <span className="flex flex-col leading-tight">
-        <span className="text-sm font-bold tracking-tight text-sidebar-accent-foreground">Gelar Rasa</span>
-        <span className="text-[11px] text-sidebar-foreground/70">Air Quality Intelligence</span>
+        <span className="text-sm font-bold tracking-tight text-sidebar-accent-foreground">SI-NAPAS</span>
+        <span className="text-[11px] text-sidebar-foreground/70">Udara & Kelompok Rentan</span>
       </span>
     </Link>
   )
@@ -32,7 +29,6 @@ function Logo() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isLive = LIVE_PAGES.some((p) => pathname.startsWith(p))
 
   return (
     <div className="flex min-h-dvh">
@@ -67,38 +63,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )
           })}
         </nav>
-        <div className="m-3 rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-4">
-          <div className="flex items-center gap-2 text-xs font-semibold text-sidebar-accent-foreground">
-            <Activity className="size-3.5 text-sidebar-primary" aria-hidden />
-            Status data
-          </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-sidebar-foreground/70">
-            {isLive ? (
-              <>
-                Halaman ini memakai <span className="font-semibold text-sidebar-primary">data AQMS nyata</span> (1 Jan
-                2024 – 14 Okt 2026).
-              </>
-            ) : (
-              <>
-                Halaman ini masih memakai <span className="font-semibold text-warning">data dummy</span> untuk
-                keperluan prototipe.
-              </>
-            )}
-          </p>
-        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 border-b border-sidebar-border bg-sidebar text-sidebar-foreground lg:hidden">
-          <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center px-4 py-3">
             <div className="[&_a]:gap-2">
               <Logo />
             </div>
-            {!isLive && (
-              <span className="rounded-full bg-warning/20 px-2.5 py-1 text-[11px] font-semibold text-warning">
-                Data dummy
-              </span>
-            )}
           </div>
           <nav aria-label="Navigasi utama" className="flex gap-1 overflow-x-auto px-3 pb-3">
             {NAV_ITEMS.map((item) => {
