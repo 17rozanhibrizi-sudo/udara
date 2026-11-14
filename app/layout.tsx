@@ -9,7 +9,7 @@ const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakart
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' })
 
 export const metadata: Metadata = {
-  title: 'Gelar Rasa · Dasbor Kualitas Udara & Kesehatan',
+  title: 'SI-NAPAS · Menutup Titik Buta Pemantauan Udara & Melindungi Kelompok Rentan',
   description:
     'Dasbor pemantauan kualitas udara (AQMS), pola & faktor pemengaruh, dampak kesehatan, serta evaluasi jaringan dan rekomendasi kebijakan.',
   generator: 'v0.app',
