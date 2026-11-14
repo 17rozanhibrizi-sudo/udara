@@ -1,15 +1,49 @@
+import rawDaily from "./aqms-daily.json"
+
+/* ============================================================
+ * SUMBER DATA NYATA
+ * lib/aqms-daily.json = hasil ekstrak dataset_clean/04_env_health_daily_ready.csv
+ * Format kolom (columnar): rows.s = indeks stasiun, rows.d = hari ke-N sejak meta.start
+ * ============================================================ */
+type RawStation = {
+  code: string
+  locationId: string
+  name: string
+  fullName: string
+  province: string
+  city: string
+  region: Exclude<Region, "nasional">
+  type: string
+  siteType: string
+  status: string
+  lat: number
+  lng: number
+  completeness: number
+  hasData: boolean
+}
+type RawRows = Record<
+  "s" | "d" | "pm25" | "pm10" | "so2" | "co" | "o3" | "no2" | "i" | "ip25" | "ip10" | "iso2" | "ico" | "io3" | "ino2",
+  number[]
+>
+type RawDaily = {
+  meta: { start: string; end: string; rows: number; source: string }
+  stations: RawStation[]
+  rows: RawRows
+}
+const RAW = rawDaily as unknown as RawDaily
+
 export type Region = "nasional" | "sumatera" | "jawa" | "kalimantan" | "sulawesi" | "maluku-papua"
 export type Pollutant = "PM2.5" | "PM10" | "CO" | "SO2" | "NO2" | "O3"
 export type Disease = "ISPA" | "Kardiovaskular" | "Asma darurat" | "PPOK" | "Kematian"
 export type IspuKey = "baik" | "sedang" | "tidakSehat" | "sangat" | "bahaya"
 
 export const REGIONS: { value: Region; label: string; factor: number; yoy: number }[] = [
-  { value: "nasional", label: "Semua Wilayah", factor: 0.84, yoy: 4.2 },
+  { value: "nasional", label: "Nasional (semua)", factor: 0.84, yoy: 4.2 },
   { value: "sumatera", label: "Sumatera", factor: 0.93, yoy: 6.2 },
   { value: "jawa", label: "Jawa", factor: 0.78, yoy: -3.1 },
   { value: "kalimantan", label: "Kalimantan", factor: 1, yoy: 9.6 },
   { value: "sulawesi", label: "Sulawesi", factor: 0.72, yoy: 1.8 },
-  { value: "maluku-papua", label: "Papua", factor: 0.55, yoy: -2.4 },
+  { value: "maluku-papua", label: "Maluku & Papua", factor: 0.55, yoy: -2.4 },
 ]
 
 export const POLLUTANTS: {
@@ -24,33 +58,51 @@ export const POLLUTANTS: {
   { value: "CO", label: "CO", standard: 4000, ratio: 0.42, exceed: 1 },
   { value: "SO2", label: "SO₂", standard: 75, ratio: 0.48, exceed: 2 },
   { value: "NO2", label: "NO₂", standard: 65, ratio: 0.55, exceed: 4 },
-  { value: "O3", label: "O₃", standard: 100, ratio: 0.6, exceed: 6 },
+  { value: "O3", label: "O₃", standard: 150, ratio: 0.6, exceed: 6 },
 ]
 
 /* ---------- Rentang tanggal (kalender) ---------- */
 
 export type DateRange = { from: string; to: string } // ISO yyyy-mm-dd
 
-/** Periode observasi data nyata (03_aqms_daily_ispu.csv) */
-export const DATA_MIN = "2024-01-01"
-export const DATA_MAX = "2026-10-14"
-
-const lastNDays = (n: number): DateRange => ({ from: toISO(addDays(parseISO(DATA_MAX), -(n - 1))), to: DATA_MAX })
-
-export const DEFAULT_RANGE: DateRange = lastNDays(30)
-
-export const RANGE_PRESETS: { label: string; range: DateRange }[] = [
-  { label: "30 hari terakhir", range: lastNDays(30) },
-  { label: "90 hari terakhir", range: lastNDays(90) },
-  { label: "Oktober 2025", range: { from: "2025-10-01", to: "2025-10-31" } },
-  { label: "Tahun 2025", range: { from: "2025-01-01", to: "2025-12-31" } },
-  { label: "Semua periode", range: { from: DATA_MIN, to: DATA_MAX } },
-]
+/** Periode observasi data AQMS (diambil dari metadata JSON) */
+export const DATA_MIN = RAW.meta.start
+export const DATA_MAX = RAW.meta.end
+/**
+ * Default dashboard = 30 hari terakhir DATA (bukan hari ini!).
+ * Data berhenti di DATA_MAX, jadi filter berbasis tanggal hari ini akan kosong.
+ */
+export const DEFAULT_RANGE: DateRange = { from: toISO(addDays(parseISO(DATA_MAX), -29)), to: DATA_MAX }
 
 export const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
 export const MONTHS_LONG = [
   "Januari", "Februari", "Maret", "April", "Mei", "Juni",
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+]
+
+function monthRange(year: number, month0: number): DateRange {
+  const from = toISO(new Date(Date.UTC(year, month0, 1)))
+  const last = toISO(new Date(Date.UTC(year, month0 + 1, 0)))
+  return { from, to: last > DATA_MAX ? DATA_MAX : last }
+}
+
+const _max = parseISO(DATA_MAX)
+const _prevMonth = new Date(Date.UTC(_max.getUTCFullYear(), _max.getUTCMonth() - 1, 1))
+
+/** Preset kalender: dihitung dari DATA_MAX supaya otomatis ikut kalau datanya di-update */
+export const RANGE_PRESETS: { label: string; range: DateRange }[] = [
+  { label: "30 hari terakhir", range: DEFAULT_RANGE },
+  { label: "90 hari terakhir", range: { from: toISO(addDays(_max, -89)), to: DATA_MAX } },
+  {
+    label: `${MONTHS_LONG[_max.getUTCMonth()]} ${_max.getUTCFullYear()}`,
+    range: monthRange(_max.getUTCFullYear(), _max.getUTCMonth()),
+  },
+  {
+    label: `${MONTHS_LONG[_prevMonth.getUTCMonth()]} ${_prevMonth.getUTCFullYear()}`,
+    range: monthRange(_prevMonth.getUTCFullYear(), _prevMonth.getUTCMonth()),
+  },
+  { label: `Tahun ${_max.getUTCFullYear() - 1}`, range: { from: `${_max.getUTCFullYear() - 1}-01-01`, to: `${_max.getUTCFullYear() - 1}-12-31` } },
+  { label: "Semua periode", range: { from: DATA_MIN, to: DATA_MAX } },
 ]
 
 export function parseISO(iso: string) {
@@ -131,18 +183,6 @@ export const DISEASES: {
   { value: "Kematian", total: 57, group: "Lansia (>60 th)", groupShare: 76, groupNote: "lansia 76% vs lainnya 24%", lag: 4, r: 0.28 },
 ]
 
-export type DiseaseSelection = Disease | "ALL"
-
-/** Dipakai dropdown Jenis Penyakit: "Semua Penyakit" paling atas */
-export const DISEASE_OPTIONS: { value: DiseaseSelection; label: string }[] = [
-  { value: "ALL", label: "Semua Penyakit" },
-  { value: "ISPA", label: "ISPA / Pernapasan Umum" },
-  { value: "Asma darurat", label: "Asma Darurat" },
-  { value: "PPOK", label: "PPOK" },
-  { value: "Kardiovaskular", label: "Kardiovaskular" },
-  { value: "Kematian", label: "Kematian" },
-]
-
 export const ISPU_CATEGORIES: { key: IspuKey; label: string; color: string; range: string }[] = [
   { key: "baik", label: "Baik", color: "var(--ispu-baik)", range: "0–50" },
   { key: "sedang", label: "Sedang", color: "var(--ispu-sedang)", range: "51–100" },
@@ -151,12 +191,26 @@ export const ISPU_CATEGORIES: { key: IspuKey; label: string; color: string; rang
   { key: "bahaya", label: "Berbahaya", color: "var(--ispu-bahaya)", range: ">300" },
 ]
 
+/** Kategori khusus untuk stasiun tanpa data (abu-abu). Dicast agar tipe pemanggil lama tidak berubah. */
+export const NO_DATA_CATEGORY = {
+  key: "nodata",
+  label: "Tidak ada data",
+  color: "var(--muted-foreground)",
+  range: "–",
+} as unknown as (typeof ISPU_CATEGORIES)[number]
+
+/** Permen LHK No. 14/2020: ≤50 Baik · ≤100 Sedang · ≤200 Tidak sehat · ≤300 Sangat tidak sehat · >300 Berbahaya */
+export function ispuIndex(ispu: number) {
+  if (ispu <= 50) return 0
+  if (ispu <= 100) return 1
+  if (ispu <= 200) return 2
+  if (ispu <= 300) return 3
+  return 4
+}
+
 export function ispuCategory(ispu: number) {
-  if (ispu <= 50) return ISPU_CATEGORIES[0]
-  if (ispu <= 100) return ISPU_CATEGORIES[1]
-  if (ispu <= 200) return ISPU_CATEGORIES[2]
-  if (ispu <= 300) return ISPU_CATEGORIES[3]
-  return ISPU_CATEGORIES[4]
+  if (!Number.isFinite(ispu)) return NO_DATA_CATEGORY
+  return ISPU_CATEGORIES[ispuIndex(ispu)]
 }
 
 export type Station = {
@@ -213,11 +267,6 @@ export function getDisease(d: Disease) {
   return DISEASES.find((x) => x.value === d)!
 }
 
-const BASE_DAILY = [
-  37, 41, 46, 50, 52, 47, 49, 50, 50, 49, 38, 37, 36, 36, 37, 30, 33, 38, 43, 50, 47, 54, 60, 66, 70, 64, 66, 67,
-  67, 66, 56,
-]
-
 export type Filters = { region: Region; pollutant: Pollutant; range: DateRange }
 
 export function filterFactor({ region, pollutant, range }: Filters) {
@@ -228,37 +277,299 @@ function round1(n: number) {
   return Math.round(n * 10) / 10
 }
 
+/* ============================================================
+ * DATA NYATA AQMS — grid harian per stasiun (dibangun sekali saat modul dimuat)
+ * ============================================================ */
+
+const POL_KEYS: Pollutant[] = ["PM2.5", "PM10", "CO", "SO2", "NO2", "O3"]
+const CONC_KEY: Record<Pollutant, keyof RawRows> = { "PM2.5": "pm25", PM10: "pm10", CO: "co", SO2: "so2", NO2: "no2", O3: "o3" }
+const SUB_KEY: Record<Pollutant, keyof RawRows> = { "PM2.5": "ip25", PM10: "ip10", CO: "ico", SO2: "iso2", NO2: "ino2", O3: "io3" }
+
+const N_DAYS = Math.round((parseISO(RAW.meta.end).getTime() - parseISO(RAW.meta.start).getTime()) / 86400000) + 1
+const START_DATE = parseISO(RAW.meta.start)
+
+type Grid = { conc: Record<Pollutant, Float64Array>; sub: Record<Pollutant, Float64Array>; score: Float64Array }
+const emptyArr = () => new Float64Array(N_DAYS).fill(NaN)
+const emptyByPol = () => Object.fromEntries(POL_KEYS.map((p) => [p, emptyArr()])) as Record<Pollutant, Float64Array>
+
+const GRIDS: Grid[] = RAW.stations.map(() => ({ conc: emptyByPol(), sub: emptyByPol(), score: emptyArr() }))
+for (let k = 0; k < RAW.rows.s.length; k++) {
+  const g = GRIDS[RAW.rows.s[k]]
+  const d = RAW.rows.d[k]
+  for (const p of POL_KEYS) {
+    g.conc[p][d] = RAW.rows[CONC_KEY[p]][k]
+    g.sub[p][d] = RAW.rows[SUB_KEY[p]][k]
+  }
+  g.score[d] = RAW.rows.i[k]
+}
+
+function dayIdx(iso: string) {
+  return Math.round((parseISO(iso).getTime() - START_DATE.getTime()) / 86400000)
+}
+/** [awal, akhir] indeks hari yang beririsan dengan data, atau null bila di luar jangkauan */
+function clipRange(range: DateRange): [number, number] | null {
+  const a = Math.max(0, dayIdx(range.from))
+  const b = Math.min(N_DAYS - 1, dayIdx(range.to))
+  return a <= b ? [a, b] : null
+}
+function isoAt(i: number) {
+  return toISO(addDays(START_DATE, i))
+}
+function regionStationIdx(region: Region): number[] {
+  const out: number[] = []
+  RAW.stations.forEach((s, i) => {
+    if (region === "nasional" || s.region === region) out.push(i)
+  })
+  return out
+}
+function spansYears(range: DateRange) {
+  return range.from.slice(0, 4) !== range.to.slice(0, 4)
+}
+function labelOf(iso: string, withYear: boolean) {
+  const d = parseISO(iso)
+  return `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]}${withYear ? ` ${d.getUTCFullYear()}` : ""}`
+}
+
+/** Jumlah, total, dan hari melampaui baku mutu satu stasiun untuk satu polutan */
+function stationAgg(si: number, p: Pollutant, range: DateRange) {
+  let sum = 0
+  let n = 0
+  let ex = 0
+  const w = clipRange(range)
+  if (!w) return { sum, n, ex }
+  const arr = GRIDS[si].conc[p]
+  const std = getPollutant(p).standard
+  for (let d = w[0]; d <= w[1]; d++) {
+    const v = arr[d]
+    if (Number.isFinite(v)) {
+      sum += v
+      n++
+      if (v > std) ex++
+    }
+  }
+  return { sum, n, ex }
+}
+
+/**
+ * Agregat wilayah untuk satu polutan.
+ * avg   = rata-rata aritmetik seluruh baris stasiun-hari (µg/m³)
+ * above = rata-rata (lintas stasiun) jumlah hari rata-rata harian > baku mutu
+ * days  = rata-rata (lintas stasiun) jumlah hari yang punya data → penyebut "x dari y hari"
+ * Stasiun tanpa data di rentang terpilih tidak ikut dihitung.
+ */
+function pollutantStat(idx: number[], p: Pollutant, range: DateRange) {
+  let sum = 0
+  let n = 0
+  let ex = 0
+  let days = 0
+  let count = 0
+  for (const si of idx) {
+    const a = stationAgg(si, p, range)
+    if (a.n === 0) continue
+    sum += a.sum
+    n += a.n
+    ex += a.ex
+    days += a.n
+    count++
+  }
+  return count
+    ? { avg: sum / n, above: ex / count, days: days / count, stationCount: count }
+    : { avg: NaN, above: 0, days: 0, stationCount: 0 }
+}
+
+/** Periode yang sama pada tahun sebelumnya */
+export function previousYearRange(range: DateRange): DateRange {
+  const shift = (iso: string) => {
+    const d = parseISO(iso)
+    d.setUTCFullYear(d.getUTCFullYear() - 1)
+    return toISO(d)
+  }
+  return { from: shift(range.from), to: shift(range.to) }
+}
+
+/**
+ * Perubahan YoY (%) = (rata-rata periode aktif − rata-rata periode sama tahun lalu) / rata-rata tahun lalu × 100.
+ * Hanya stasiun yang punya data di KEDUA periode yang dibandingkan.
+ * NaN = tidak bisa dihitung (periode pembanding sebelum DATA_MIN atau tanpa data).
+ */
+function yoyPct(idx: number[], p: Pollutant, range: DateRange): number {
+  const prev = previousYearRange(range)
+  if (prev.from < DATA_MIN) return NaN
+  let cs = 0
+  let cn = 0
+  let ps = 0
+  let pn = 0
+  for (const si of idx) {
+    const c = stationAgg(si, p, range)
+    const q = stationAgg(si, p, prev)
+    if (c.n === 0 || q.n === 0) continue
+    cs += c.sum
+    cn += c.n
+    ps += q.sum
+    pn += q.n
+  }
+  if (!cn || !pn) return NaN
+  const old = ps / pn
+  return old > 0 ? ((cs / cn - old) / old) * 100 : NaN
+}
+
+function meanFinite(v: number[]) {
+  const f = v.filter(Number.isFinite)
+  return f.length ? f.reduce((a, b) => a + b, 0) / f.length : NaN
+}
+
+/** Rata-rata harian lintas stasiun (hari tanpa data dilewati) */
+function dailyRows(idx: number[], p: Pollutant, range: DateRange) {
+  const out: { date: string; value: number }[] = []
+  const w = clipRange(range)
+  if (!w) return out
+  for (let d = w[0]; d <= w[1]; d++) {
+    let sum = 0
+    let n = 0
+    for (const si of idx) {
+      const v = GRIDS[si].conc[p][d]
+      if (Number.isFinite(v)) {
+        sum += v
+        n++
+      }
+    }
+    if (n) out.push({ date: isoAt(d), value: sum / n })
+  }
+  return out
+}
+
+/** Deret harian satu polutan. Hari tanpa data sama sekali dilewati (tidak digambar). */
 export function getDailySeries(filters: Filters) {
-  const pol = getPollutant(filters.pollutant)
-  const base = (getRegion(filters.region).factor * pol.ratio * pol.standard) / 55
-  return rangeDates(filters.range).map((d) => ({
-    day: `${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]}`,
-    value: round1(BASE_DAILY[d.getUTCDate() - 1] * base * monthFactor(d)),
-    standard: pol.standard,
+  const std = getPollutant(filters.pollutant).standard
+  const withYear = spansYears(filters.range)
+  return dailyRows(regionStationIdx(filters.region), filters.pollutant, filters.range).map((r) => ({
+    day: labelOf(r.date, withYear),
+    date: r.date,
+    value: round1(r.value),
+    standard: std,
   }))
 }
 
 export function getOverviewKpis(filters: Filters) {
-  const series = getDailySeries(filters)
-  const avg = series.reduce((a, b) => a + b.value, 0) / series.length
-  const above = series.filter((d) => d.value > d.standard).length
-  const pollutantShift = { "PM2.5": 0, PM10: -1.4, CO: -4.2, SO2: -2.7, NO2: 1.3, O3: 2.1 }[filters.pollutant]
+  const idx = regionStationIdx(filters.region)
+  const s = pollutantStat(idx, filters.pollutant, filters.range)
   return {
-    avg: round1(avg),
-    above,
-    days: series.length,
-    yoy: round1(getRegion(filters.region).yoy + pollutantShift),
+    avg: round1(s.avg),
+    above: Math.round(s.above),
+    days: Math.round(s.days),
+    /** NaN = tidak tersedia (tampilkan "N/A") */
+    yoy: round1(yoyPct(idx, filters.pollutant, filters.range)),
+    stationCount: s.stationCount,
+    hasData: s.stationCount > 0,
   }
 }
 
-export function getExceedance(filters: Filters) {
-  const factor = getRegion(filters.region).factor * rangeFactor(filters.range)
-  return POLLUTANTS.map((p) => ({
-    pollutant: p.label,
-    key: p.value,
-    value: Math.min(100, Math.round(p.exceed * factor)),
-  }))
+/** % hari melampaui baku mutu per polutan (konsisten dengan KPI "hari di atas baku mutu") */
+export function getExceedance(filters: Pick<Filters, "region" | "range">) {
+  const idx = regionStationIdx(filters.region)
+  return POLLUTANTS.map((p) => {
+    const s = pollutantStat(idx, p.value, filters.range)
+    return { pollutant: p.label, key: p.value, value: s.days > 0 ? Math.min(100, Math.round((s.above / s.days) * 100)) : 0 }
+  })
 }
+
+/** Mode "Semua polutan": satu baris per hari, nilai tiap polutan dalam % baku mutu */
+export function getDailySeriesAll(base: Omit<Filters, "pollutant">): MultiRow[] {
+  const idx = regionStationIdx(base.region)
+  const withYear = spansYears(base.range)
+  const perPol = POLLUTANTS.map((p) => ({
+    p,
+    map: new Map(dailyRows(idx, p.value, base.range).map((r) => [r.date, r.value] as const)),
+  }))
+  const dates = [...new Set(perPol.flatMap((x) => [...x.map.keys()]))].sort()
+  return dates.map((date) => {
+    const row: MultiRow = { label: labelOf(date, withYear) }
+    perPol.forEach(({ p, map }) => {
+      const v = map.get(date)
+      if (v !== undefined) row[p.value] = round1((v / p.standard) * 100)
+    })
+    return row
+  })
+}
+
+/* ---------- Stasiun untuk Overview (peta + 2 grafik bawah) ---------- */
+
+export type LiveStation = Station & {
+  fullName: string
+  province: string
+  city: string
+  status: string
+  /** false = tidak ada baris data pada rentang terpilih (mis. AQMS-JMB-02 rusak) */
+  hasData: boolean
+  nDays: number
+}
+
+/**
+ * Stasiun di wilayah terpilih lengkap dengan statistik periode.
+ * - avg      : rata-rata polutan terpilih (PM2.5 bila "Semua polutan"), NaN bila tak ada data
+ * - ispuNow  : rata-rata skor ISPU periode (skor tertinggi bila "Semua polutan", sub-indeks polutan bila dipilih), NaN bila tak ada data
+ * - ispu     : % hari per kategori [baik, sedang, tidak sehat, sangat tidak sehat, berbahaya]
+ * - yoy      : % perubahan vs periode sama tahun lalu (rata-rata 6 polutan bila "Semua"), NaN = N/A
+ * Field khusus halaman Pola & Faktor diisi placeholder sampai halaman itu dimigrasi.
+ */
+export function getOverviewStations(opts: { region: Region; selection: PollutantSelection; range: DateRange }): LiveStation[] {
+  const { region, selection, range } = opts
+  const isAll = selection === "ALL"
+  const p = resolvePollutant(selection)
+  const w = clipRange(range)
+
+  return regionStationIdx(region).map((si) => {
+    const s = RAW.stations[si]
+    const g = GRIDS[si]
+    const agg = stationAgg(si, p, range)
+
+    const counts = [0, 0, 0, 0, 0]
+    let ispuSum = 0
+    let ispuN = 0
+    if (w) {
+      const arr = isAll ? g.score : g.sub[p]
+      for (let d = w[0]; d <= w[1]; d++) {
+        const v = arr[d]
+        if (Number.isFinite(v)) {
+          counts[ispuIndex(v)]++
+          ispuSum += v
+          ispuN++
+        }
+      }
+    }
+    const pct = (n: number) => (ispuN ? round1((n / ispuN) * 100) : 0)
+    const yoy = isAll ? meanFinite(POL_KEYS.map((q) => yoyPct([si], q, range))) : yoyPct([si], p, range)
+
+    return {
+      code: s.code,
+      name: s.name,
+      region: s.region,
+      type: s.type,
+      lat: s.lat,
+      lng: s.lng,
+      avg: agg.n ? round1(agg.sum / agg.n) : NaN,
+      ispuNow: ispuN ? Math.round(ispuSum / ispuN) : NaN,
+      ispu: [pct(counts[0]), pct(counts[1]), pct(counts[2]), pct(counts[3]), pct(counts[4])],
+      yoy: round1(yoy),
+      completeness: s.completeness,
+      // placeholder (halaman Pola & Faktor belum memakai data nyata)
+      peakHour: "–",
+      season: "–",
+      weekdayDiff: "–",
+      episode: 0,
+      factor: "–",
+      r: 0,
+      r2: 0,
+      fullName: s.fullName,
+      province: s.province,
+      city: s.city,
+      status: s.status,
+      hasData: ispuN > 0,
+      nDays: agg.n,
+    }
+  })
+}
+
 
 export const HOURLY_BASE = [36, 36, 36, 36, 37, 40, 45, 48, 48, 45, 40, 37, 36, 36, 36, 37, 38, 41, 43, 45, 43, 40, 37, 36]
 
@@ -269,23 +580,27 @@ export function getHourlySeries(filters: Filters) {
 
 export function getWeeklySeries(filters: Filters) {
   const series = getDailySeries(filters)
-  const dates = rangeDates(filters.range)
   const gran = getPeriodGranularity(filters.range)
+  const withYear = spansYears(filters.range)
   const mean = (v: number[]) => v.reduce((x, y) => x + y, 0) / v.length
   if (gran === "hari") return series.map((d) => ({ week: d.day, value: Math.round(d.value) }))
   if (gran === "bulan") {
-    const groups = new Map<string, number[]>()
-    series.forEach((d, i) => {
-      const key = `${MONTHS_SHORT[dates[i].getUTCMonth()]}`
-      groups.set(key, [...(groups.get(key) ?? []), d.value])
+    const groups = new Map<string, { label: string; v: number[] }>()
+    series.forEach((d) => {
+      const dt = parseISO(d.date)
+      const key = d.date.slice(0, 7)
+      const label = `${MONTHS_SHORT[dt.getUTCMonth()]}${withYear ? ` ${dt.getUTCFullYear()}` : ""}`
+      const g = groups.get(key) ?? { label, v: [] }
+      g.v.push(d.value)
+      groups.set(key, g)
     })
-    return [...groups].map(([week, v]) => ({ week, value: Math.round(mean(v)) }))
+    return [...groups.values()].map((g) => ({ week: g.label, value: Math.round(mean(g.v)) }))
   }
   const out: { week: string; value: number }[] = []
   for (let i = 0; i < series.length; i += 7) {
     const chunk = series.slice(i, i + 7)
-    const a = dates[i]
-    const b = dates[i + chunk.length - 1]
+    const a = parseISO(chunk[0].date)
+    const b = parseISO(chunk[chunk.length - 1].date)
     const sameMonth = a.getUTCMonth() === b.getUTCMonth()
     const label = sameMonth
       ? `${a.getUTCDate()}–${b.getUTCDate()} ${MONTHS_SHORT[b.getUTCMonth()]}`
@@ -295,15 +610,16 @@ export function getWeeklySeries(filters: Filters) {
   return out
 }
 
-/** Episode terpanjang: hari berturut-turut rata-rata harian > baku mutu */
+/** Episode terpanjang: hari KALENDER berturut-turut dengan rata-rata harian > baku mutu */
 export function getLongestEpisode(filters: Filters) {
   const series = getDailySeries(filters)
   let best = { len: 0, start: -1 }
   let cur = { len: 0, start: -1 }
   series.forEach((d, i) => {
+    const contiguous = i > 0 && parseISO(d.date).getTime() - parseISO(series[i - 1].date).getTime() === 86400000
     if (d.value > d.standard) {
-      if (cur.len === 0) cur.start = i
-      cur.len++
+      if (cur.len > 0 && contiguous) cur.len++
+      else cur = { len: 1, start: i }
       if (cur.len > best.len) best = { ...cur }
     } else {
       cur = { len: 0, start: -1 }
@@ -351,17 +667,6 @@ export function getHourlySeriesAll(base: BaseFilters): MultiRow[] {
   const perPol = POLLUTANTS.map((p) => ({ p, s: getHourlySeries({ ...base, pollutant: p.value }) }))
   return perPol[0].s.map((h, i) => {
     const row: MultiRow = { label: h.hour }
-    perPol.forEach(({ p, s }) => {
-      row[p.value] = round1((s[i].value / p.standard) * 100)
-    })
-    return row
-  })
-}
-
-export function getDailySeriesAll(base: BaseFilters): MultiRow[] {
-  const perPol = POLLUTANTS.map((p) => ({ p, s: getDailySeries({ ...base, pollutant: p.value }) }))
-  return perPol[0].s.map((d, i) => {
-    const row: MultiRow = { label: d.day }
     perPol.forEach(({ p, s }) => {
       row[p.value] = round1((s[i].value / p.standard) * 100)
     })
