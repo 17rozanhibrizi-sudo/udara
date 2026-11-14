@@ -56,13 +56,16 @@ export function FilterBar({
 }) {
   const f = useFilters()
   const pollutantOptions = singlePollutant ? POLLUTANT_OPTIONS.filter((o) => o.value !== "ALL") : POLLUTANT_OPTIONS
-  // Di halaman satu-polutan, "ALL" dipetakan ke PM2.5, jadi kondisi hasil Reset = Semua Wilayah + PM2.5 + seluruh periode
-  const atDefault = singlePollutant
-    ? f.region === RESET_FILTERS.region &&
-      (f.pollutant === "PM2.5" || (f.pollutant as string) === "ALL") &&
-      f.range.from === RESET_FILTERS.range.from &&
-      f.range.to === RESET_FILTERS.range.to
-    : f.isDefault
+  // Tombol Reset nonaktif bila SEMUA slicer yang tampil di halaman ini sudah sama dengan kondisi hasil Reset.
+  // Halaman satu-polutan: "ALL" dipetakan ke PM2.5, jadi PM2.5 dianggap kondisi awal.
+  const atDefault =
+    (!show.includes("region") || f.region === RESET_FILTERS.region) &&
+    (!show.includes("pollutant") ||
+      (singlePollutant
+        ? f.pollutant === "PM2.5" || (f.pollutant as string) === "ALL"
+        : f.pollutant === RESET_FILTERS.pollutant)) &&
+    (!show.includes("disease") || f.disease === RESET_FILTERS.disease) &&
+    (!show.includes("period") || (f.range.from === RESET_FILTERS.range.from && f.range.to === RESET_FILTERS.range.to))
 
   return (
     <div className="relative z-30 rounded-xl border bg-card/70 p-3 shadow-xs backdrop-blur">
