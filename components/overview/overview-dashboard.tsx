@@ -213,7 +213,7 @@ function OverviewContent({ db }: { db: OverviewDB }) {
           }
         >
           <div className="h-72">
-            <StationMap stations={stations} selected={selected} onSelect={setSelected} />
+           <StationMap stations={stations} selected={selectedStation ? selected : null} onSelect={setSelected} />
           </div>
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5">
             {ISPU_CATEGORIES.map((c) => (
