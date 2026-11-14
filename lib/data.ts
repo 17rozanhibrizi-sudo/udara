@@ -1,4 +1,4 @@
-import rawDaily from "./aqms-daily.json"
+import rawDaily from "../aqms-daily.json"
 
 /* ============================================================
  * SUMBER DATA NYATA
