@@ -176,7 +176,9 @@ function PolaContent({ db }: { db: PolaDB }) {
           subtitle="Klik batang untuk mengganti sumbu X pada scatter"
           footnote={
             (dominantRow
-              ? `Faktor dominan: ${dominantRow.factor} (r = ${formatId(dominantRow.r ?? 0, 2)}), batang oranye bila tidak sedang dipilih. `
+              ? corr.dominantWeak
+                ? `Korelasi terkuat: ${dominantRow.factor} (r = ${formatId(dominantRow.r ?? 0, 2)}), tergolong lemah (|r| < 0,1), jadi tidak ada faktor dominan yang jelas. `
+                : `Faktor dominan: ${dominantRow.factor} (r = ${formatId(dominantRow.r ?? 0, 2)}), batang oranye bila tidak sedang dipilih. `
               : "") +
             "Suhu, kelembapan, angin: n = hari-stasiun. Lalu lintas & jarak jalan tetap per lokasi, jadi dihitung antar-stasiun (n = jumlah stasiun)."
           }
@@ -216,7 +218,7 @@ function PolaContent({ db }: { db: PolaDB }) {
       <Panel
         title="Tabel rincian stasiun"
         subtitle="Pola waktu & faktor pemengaruh per stasiun AQMS"
-        footnote="Selisih = rata-rata hari kerja − akhir pekan (% terhadap hari kerja). Faktor dominan dipilih dari suhu, kelembapan, dan kecepatan angin (|r| terbesar). Kelengkapan = % data valid terhadap seluruh rekaman sensor."
+        footnote="Selisih = rata-rata hari kerja − akhir pekan (% terhadap hari kerja). Faktor dominan dipilih dari suhu, kelembapan, dan kecepatan angin (|r| terbesar); |r| < 0,1 dianggap lemah. Kelengkapan = % data valid terhadap seluruh rekaman sensor."
       >
         <div className="overflow-x-auto">
           <Table>
@@ -266,7 +268,19 @@ function StationRow({ s, hourlyLoading }: { s: PolaRow; hourlyLoading: boolean }
             {s.weekday ? `${signed(s.weekday.diff)} (${signed(s.weekday.pct, 0)}%)` : dash}
           </TableCell>
           <TableCell className="text-right tabular-nums">{s.episode.len} hari</TableCell>
-          <TableCell>{s.factor?.label ?? dash}</TableCell>
+          <TableCell>
+            {s.factor ? (
+              s.factor.weak ? (
+                <span className="text-muted-foreground" title={`Korelasi terkuat: ${s.factor.label}`}>
+                  Lemah (|r| &lt; 0,1)
+                </span>
+              ) : (
+                s.factor.label
+              )
+            ) : (
+              dash
+            )}
+          </TableCell>
           <TableCell className="tabular-nums">
             {s.factor ? `r ${signed(s.factor.r, 2)} · R² ${formatId(s.factor.r2, 2)}` : dash}
           </TableCell>
