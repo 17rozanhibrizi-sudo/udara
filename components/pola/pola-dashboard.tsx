@@ -99,7 +99,7 @@ function PolaContent({ db }: { db: PolaDB }) {
   return (
     <div className="mx-auto flex max-w-[1400px] flex-col gap-5 p-4 md:p-6 lg:p-8">
       <Header />
-      <FilterBar show={["region", "pollutant", "period"]} />
+      <FilterBar show={["region", "pollutant", "period"]} singlePollutant />
 
       <div className="grid gap-4 lg:grid-cols-12">
         <Panel
